@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Report Pro | Official</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .ios-card { background: white; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        input, select, textarea { font-size: 17px !important; }
+        .btn-action { height: 55px; border-radius: 15px; font-weight: 800; transition: all 0.2s; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body class="bg-[#F8F9FC] min-h-screen text-slate-800">
+
+    <div class="sticky top-0 z-50 bg-white border-b border-slate-100 p-4 no-print">
+        <div class="flex justify-between items-center max-w-4xl mx-auto">
+            <div>
+                <h1 class="text-xl font-black text-slate-900 tracking-tight">DAILY REPORT <span class="text-blue-600">PRO</span></h1>
+                <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Professor Edition</p>
+            </div>
+            <div class="text-right">
+                <p id="liveClock" class="text-sm font-bold text-slate-700"></p>
+                <p id="todayDate" class="text-[10px] text-blue-500 font-bold"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto p-4 space-y-6">
+        
+        <div class="ios-card p-5 no-print space-y-4 border border-slate-100">
+            <div class="flex items-center justify-between border-b pb-3">
+                <h2 class="font-bold text-slate-600 uppercase text-xs tracking-wider">New Task Entry</h2>
+                <span class="bg-blue-50 text-blue-600 text-[10px] px-2 py-1 rounded-full font-bold">Ahmed Faisal Sys</span>
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-[11px] font-black text-slate-400 uppercase ml-1">Site Identification</label>
+                <div class="flex gap-2">
+                    <input list="siteCodes" id="siteCode" class="flex-1 bg-slate-50 border border-slate-200 p-3 rounded-xl focus:border-blue-500 outline-none" placeholder="Enter Site Code">
+                    <button onclick="addNewSite()" class="bg-slate-800 text-white px-4 rounded-xl active:scale-95"><i class="fas fa-plus text-sm"></i></button>
+                    <datalist id="siteCodes"></datalist>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                    <label class="text-[11px] font-black text-slate-400 uppercase ml-1">Client</label>
+                    <select id="clientSelect" onchange="toggleCustomClientInput()" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none">
+                        <option value="ROBI">ROBI</option>
+                        <option value="GP">GP</option>
+                        <option value="Banglalink">Banglalink</option>
+                        <option value="Teletalk">Teletalk</option>
+                        <option value="CCL">CCL</option>
+                        <option value="SCOMM">SCOMM</option>
+                        <option value="STL">STL</option>
+                        <option value="NEW_CLIENT">-- ADD NEW --</option>
+                    </select>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[11px] font-black text-slate-400 uppercase ml-1">Work Mode</label>
+                    <select id="opType" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none">
+                        <option value="Operation">Operation</option>
+                        <option value="Implementation">Implementation</option>
+                        <option value="Office Duty">Office Duty</option>
+                        <option value="Holiday">Holiday</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="customClientContainer" class="hidden animate-pulse">
+                <div class="flex gap-2 bg-blue-50 p-2 rounded-xl border border-blue-100">
+                    <input type="text" id="newClientInput" class="flex-1 bg-transparent p-2 outline-none text-sm" placeholder="Type new client name...">
+                    <button onclick="addNewClient()" class="bg-blue-600 text-white px-4 rounded-lg text-xs font-bold">ADD</button>
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-[11px] font-black text-slate-400 uppercase ml-1">Work Description</label>
+                <textarea id="description" class="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none h-24 focus:border-blue-500" placeholder="Describe the task performed..."></textarea>
+            </div>
+
+            <button onclick="saveReport()" class="w-full bg-blue-600 text-white btn-action shadow-lg shadow-blue-100 active:scale-[0.98]">
+                ADD TO TODAY'S LIST
+            </button>
+        </div>
+
+        <div class="ios-card overflow-hidden border border-slate-100">
+            <div class="p-4 bg-slate-50 border-b flex justify-between items-center no-print">
+                <h2 class="font-black text-slate-700 text-sm tracking-tighter">TASK QUEUE</h2>
+                <button onclick="sendAllToTelegram()" id="sendAllBtn" class="hidden bg-emerald-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md active:scale-90">
+                    <i class="fas fa-paper-plane mr-1"></i> Send All Reports
+                </button>
+            </div>
+
+            <div id="recordContainer" class="divide-y divide-slate-50"></div>
+            <div id="emptyMsg" class="p-12 text-center text-slate-400 text-sm italic">Queue is empty. Add tasks above.</div>
+        </div>
+
+        <footer class="text-center p-8 no-print">
+            <p class="text-[9px] font-bold text-slate-300 tracking-[0.3em] uppercase underline decoration-blue-500/30">System maintained for Professor</p>
+        </footer>
+    </div>
+
+    <script>
+        const botToken = "8582534427:AAHq4TfwFqBIy1wU9mp6bDNQGSeSD49yX94";
+        const chatId = "682844989";
+
+        let siteList = ["Vendor FAT (Mohammadpur) Office", "Vendor FAT (Ruhitpur) Office", "DHK_T0062", "DHK_X0012", "DHK_X0101", "DHK_X1117", "DHDHR49", "DHK2779"];
+        let reports = [];
+        let editIndex = -1;
+
+        function toggleCustomClientInput() {
+            const select = document.getElementById('clientSelect');
+            const container = document.getElementById('customClientContainer');
+            container.classList.toggle('hidden', select.value !== 'NEW_CLIENT');
+        }
+
+        function addNewClient() {
+            const input = document.getElementById('newClientInput');
+            const select = document.getElementById('clientSelect');
+            if(input.value.trim()) {
+                const name = input.value.trim().toUpperCase();
+                const opt = new Option(name, name);
+                select.add(opt, select.options[select.length-1]);
+                select.value = name;
+                input.value = '';
+                toggleCustomClientInput();
+            }
+        }
+
+        function addNewSite() {
+            const val = document.getElementById('siteCode').value.trim();
+            if(val && !siteList.includes(val)) {
+                siteList.push(val);
+                updateSiteDatalist();
+                alert("Site code registered.");
+            }
+        }
+
+        function updateSiteDatalist() {
+            document.getElementById('siteCodes').innerHTML = siteList.map(s => `<option value="${s}">`).join('');
+        }
+
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('todayDate').innerText = now.toLocaleDateString('en-GB').replace(/\//g, '-');
+            document.getElementById('liveClock').innerText = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+        setInterval(updateDateTime, 1000);
+        updateDateTime();
+        updateSiteDatalist();
+
+        function saveReport() {
+            const site = document.getElementById('siteCode').value;
+            const client = document.getElementById('clientSelect').value;
+            const type = document.getElementById('opType').value;
+            const desc = document.getElementById('description').value;
+            const date = document.getElementById('todayDate').innerText;
+
+            if(!site || !desc || client === 'NEW_CLIENT') { alert("Required fields missing."); return; }
+
+            const entry = { date, site, client, type, desc };
+            if(editIndex > -1) { reports[editIndex] = entry; editIndex = -1; }
+            else { reports.push(entry); }
+
+            renderRecords();
+            clearForm();
+        }
+
+        function renderRecords() {
+            const container = document.getElementById('recordContainer');
+            const sendBtn = document.getElementById('sendAllBtn');
+            const empty = document.getElementById('emptyMsg');
+            
+            empty.classList.toggle('hidden', reports.length > 0);
+            sendBtn.classList.toggle('hidden', reports.length === 0);
+            
+            container.innerHTML = reports.map((r, i) => `
+                <div class="p-4 bg-white flex flex-col gap-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-base">${r.site}</h3>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase mt-0.5">${r.client} • ${r.type}</p>
+                        </div>
+                        <div class="flex gap-3 no-print">
+                            <button onclick="editReport(${i})" class="text-slate-400 text-xs"><i class="fas fa-pen"></i></button>
+                            <button onclick="deleteReport(${i})" class="text-red-300 text-xs"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-xs leading-relaxed border-l-2 border-slate-100 pl-3 py-1">${r.desc}</p>
+                </div>
+            `).join('');
+        }
+
+        async function sendAllToTelegram() {
+            if(reports.length === 0) return;
+            
+            let message = ` *OFFICIAL DAILY WORK REPORT*\n`;
+            message += ` *Date:* ${reports[0].date}\n`;
+            message += ` *Name:* Ahmed Faisal\n`;
+            message += `───────────────────\n\n`;
+
+            reports.forEach((r, idx) => {
+                message += `${idx + 1}. *SITE:* \`${r.site}\`\n`;
+                message += `   *CLIENT:* ${r.client}\n`;
+                message += `   *MODE:* ${r.type}\n`;
+                message += `   *TASK:* ${r.desc}\n\n`;
+            });
+
+            message += `───────────────────\n`;
+            message += `_Generated by Report Pro System_`;
+
+            try {
+                const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'Markdown' })
+                });
+                if(res.ok) {
+                    alert("✅ All reports sent to Telegram!");
+                    reports = [];
+                    renderRecords();
+                } else {
+                    alert("❌ Transmission Failed.");
+                }
+            } catch (e) { alert("❌ Network Error."); }
+        }
+
+        function editReport(i) {
+            const r = reports[i];
+            document.getElementById('siteCode').value = r.site;
+            document.getElementById('description').value = r.desc;
+            document.getElementById('clientSelect').value = r.client;
+            document.getElementById('opType').value = r.type;
+            reports.splice(i, 1);
+            renderRecords();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function deleteReport(i) { if(confirm("Remove this entry?")) { reports.splice(i, 1); renderRecords(); } }
+
+        function clearForm() {
+            document.getElementById('siteCode').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('customClientContainer').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
