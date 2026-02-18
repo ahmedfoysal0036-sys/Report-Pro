@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AHMED_V16 | Batch Master Pro</title>
+    <title>AHMED_V16 | Batch Master Optimized</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -11,6 +11,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
         body { font-family: 'Roboto', sans-serif; background: #e2e8f0; margin: 0; padding: 0; overflow-x: hidden; }
         
+        /* Mobile Scroll Fix */
         .report-outer-container {
             width: 100%;
             overflow-x: auto;
@@ -19,10 +20,11 @@
             justify-content: flex-start;
         }
 
+        /* --- CENTERED A4 LANDSCAPE LAYOUT --- */
         .report-paper { 
             width: 285mm; 
             height: 195mm; 
-            background: white !important; 
+            background: white; 
             padding: 8mm; 
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             position: relative;
@@ -31,32 +33,37 @@
             justify-content: space-between;
             flex-shrink: 0;
             margin: auto;
-            color: black !important;
         }
 
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; border: 1.5px solid black; background: white; }
-        th, td { border: 1px solid black; padding: 4px; text-align: center; font-size: 11px; vertical-align: middle; color: black; }
+        /* Table Styling */
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; border: 1.5px solid black; }
+        th, td { border: 1px solid black; padding: 4px; text-align: center; font-size: 11px; vertical-align: middle; }
         
+        /* Inputs */
         .input-field { width: 100%; border: none; outline: none; background: transparent; text-align: center; font-size: 11px; }
         .header-input { border-bottom: 1px solid black; outline: none; font-weight: bold; background: transparent; }
         
+        /* Signature */
         .sig-box { border-top: 1.5px solid black; width: 160px; text-align: center; font-size: 10px; font-weight: bold; margin-bottom: 10px; }
 
-        /* UPGRADE 2: CSS TRICK FOR RENDERING */
-        #batchContainer {
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 297mm;
-            z-index: -9999;
-            background: white;
-            visibility: visible;
-            pointer-events: none;
+        .html2pdf__page-break { page-break-before: always; }
+
+        @media print { .no-print { display: none !important; } }
+        
+        /* Desktop alignment */
+        @media (min-width: 300mm) {
+            .report-outer-container { justify-content: center; }
         }
 
-        .html2pdf__page-break { page-break-before: always; }
-        @media print { .no-print { display: none !important; } }
-        @media (min-width: 300mm) { .report-outer-container { justify-content: center; } }
+        /* Batch Container Fix - Rendering Off-screen for capture */
+        #batchContainer {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            width: 297mm;
+            background: white;
+            z-index: -100;
+        }
     </style>
 </head>
 <body>
@@ -64,7 +71,7 @@
     <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 no-print flex justify-between items-center shadow-lg">
         <div class="flex items-center gap-2">
             <i class="fas fa-layer-group text-amber-400"></i>
-            <h1 class="font-bold text-xs uppercase tracking-widest">Ahmed_V16 | Pro</h1>
+            <h1 class="font-bold text-xs uppercase tracking-widest">Ahmed_V16 | Optimized</h1>
         </div>
         <div class="flex gap-2">
             <button onclick="switchTab('entry')" class="bg-blue-600 px-3 py-1.5 rounded text-[10px] font-bold">ENTRY</button>
@@ -208,22 +215,25 @@
             let history = JSON.parse(localStorage.getItem('prof_v16_db')) || [];
             history.push(data);
             localStorage.setItem('prof_v16_db', JSON.stringify(history));
-            alert("✅ Data Saved!");
+            alert("✅ Saved to History!");
             switchTab('history');
         }
 
         function renderHistory() {
             const list = document.getElementById('historyList');
             let history = JSON.parse(localStorage.getItem('prof_v16_db')) || [];
-            if(history.length === 0) { list.innerHTML = '<p class="text-center py-10 text-gray-400">Database Empty</p>'; return; }
-            list.innerHTML = [...history].reverse().map(h => `
-                <div class="flex items-center gap-3 p-3 bg-slate-50 border rounded-lg hover:border-blue-300 transition-all">
+            if(history.length === 0) { list.innerHTML = '<p class="text-center py-10">Empty Database</p>'; return; }
+            
+            // Reverse clone to keep newest first
+            const sorted = [...history].reverse();
+            list.innerHTML = sorted.map(h => `
+                <div class="flex items-center gap-3 p-3 bg-slate-50 border rounded-lg">
                     <input type="checkbox" class="history-chk w-5 h-5" value="${h.id}" onchange="updateCount()">
                     <div class="flex-1 cursor-pointer" onclick="loadReport(${h.id})">
                         <p class="font-bold text-sm">📅 ${h.date}</p>
                         <p class="text-[10px] text-gray-500 uppercase">${h.assigned}</p>
                     </div>
-                    <button onclick="loadReport(${h.id})" class="text-blue-600 text-[10px] font-bold px-2 py-1 border border-blue-600 rounded">EDIT</button>
+                    <button onclick="loadReport(${h.id})" class="text-blue-600 text-[10px] font-bold border border-blue-600 px-2 py-1 rounded hover:bg-blue-50">EDIT</button>
                 </div>`).join('');
             updateCount();
         }
@@ -253,42 +263,47 @@
             document.getElementById('selectCount').innerText = `${count} Selected`;
         }
         function selectAll() { document.querySelectorAll('.history-chk').forEach(cb => cb.checked = true); updateCount(); }
-        function clearHistory() { if(confirm("Clear database?")) { localStorage.removeItem('prof_v16_db'); renderHistory(); } }
+        function clearHistory() { if(confirm("Permanently clear history?")) { localStorage.removeItem('prof_v16_db'); renderHistory(); } }
 
-        // --- UPGRADE 1 & 3: IMPROVED PDF LOGIC ---
+        // --- PDF Generation with Timing Fix ---
         async function processBatchPDF(sendToTelegram) {
             const checkedBoxes = document.querySelectorAll('.history-chk:checked');
-            if(checkedBoxes.length === 0) { alert("Select reports first!"); return; }
+            if(checkedBoxes.length === 0) { alert("Please select at least one report!"); return; }
             
-            // ১. স্ক্রল টপে আনা (মোবাইলে ব্ল্যাঙ্ক আসা রোধ করতে)
-            window.scrollTo(0, 0);
+            const btn = sendToTelegram ? document.getElementById('btnSend') : document.getElementById('btnPdf');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            btn.disabled = true;
 
             const container = document.getElementById('batchContainer');
             container.innerHTML = '';
             let history = JSON.parse(localStorage.getItem('prof_v16_db')) || [];
             
+            let combinedHTML = '';
             checkedBoxes.forEach((cb, idx) => {
                 const data = history.find(h => h.id == cb.value);
                 if(data) {
-                    container.innerHTML += generateReportHTML(data);
-                    if(idx < checkedBoxes.length - 1) container.innerHTML += '<div class="html2pdf__page-break"></div>';
+                    combinedHTML += generateReportHTML(data);
+                    if(idx < checkedBoxes.length - 1) {
+                        combinedHTML += '<div class="html2pdf__page-break"></div>';
+                    }
                 }
             });
+            container.innerHTML = combinedHTML;
 
-            // ২. রেন্ডারিং টাইমআউট (অপেক্ষা করা যেন কন্টেন্ট লোড হয়)
-            await new Promise(r => setTimeout(r, 800));
+            // Give browser time to paint the off-screen content
+            await new Promise(r => setTimeout(r, 600));
 
             const opt = {
-                margin: 0,
-                filename: `Reports_Archive.pdf`,
+                margin: 0, 
+                filename: `Daily_Report_${new Date().getTime()}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
                     scale: 2, 
                     useCORS: true, 
                     letterRendering: true,
                     scrollY: 0,
-                    scrollX: 0,
-                    windowWidth: 1200
+                    scrollX: 0
                 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
@@ -299,18 +314,19 @@
                     const pdfBlob = await worker.output('blob');
                     const fd = new FormData();
                     fd.append('chat_id', chatId);
-                    fd.append('document', pdfBlob, `Batch_Report_${Date.now()}.pdf`);
-                    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: fd });
-                    if(response.ok) alert("✅ PDF Sent to Telegram!");
-                    else alert("❌ Failed to send to Telegram.");
+                    fd.append('document', pdfBlob, `Reports_${new Date().toLocaleDateString()}.pdf`);
+                    const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: fd });
+                    if(res.ok) alert("✅ Sent to Telegram!");
+                    else throw new Error("Telegram API Error");
                 } else {
                     await worker.save();
                 }
             } catch (err) { 
-                console.error(err);
-                alert("Generation Error: " + err.message); 
+                alert("Error: " + err.message); 
             } finally {
-                container.innerHTML = ''; // Memory cleanup
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                container.innerHTML = ''; // Cleanup memory
             }
         }
 
@@ -319,52 +335,51 @@
             for(let i=0; i<10; i++) {
                 const r = data.rows[i] || {};
                 rHtml += `<tr>
-                    <td style="height:38px; font-weight:bold; border:1px solid black; color:black;">${i+1}</td>
-                    <td style="border:1px solid black; color:black;">${r.client||''}</td>
+                    <td style="height:38px; font-weight:bold; border:1px solid black;">${i+1}</td>
+                    <td style="border:1px solid black;">${r.client||''}</td>
                     <td style="border:1px solid black; font-weight:bold; color:#1e40af;">${r.site||''}</td>
-                    <td style="border:1px solid black; text-align:left; padding-left:4px; color:black;">${r.work||''}</td>
-                    <td style="border:1px solid black; color:black;">${r.c1?'✔':''}</td>
-                    <td style="border:1px solid black; color:black;">${r.c2?'✔':''}</td>
-                    <td style="border:1px solid black; color:black;">${r.c3?'✔':''}</td>
-                    <td style="border:1px solid black; color:black;">${r.c4?'✔':''}</td>
-                    <td style="border:1px solid black; color:black;">${r.rem||''}</td>
+                    <td style="border:1px solid black; text-align:left; padding-left:4px;">${r.work||''}</td>
+                    <td style="border:1px solid black;">${r.c1?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.c2?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.c3?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.c4?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.rem||''}</td>
                 </tr>`;
             }
-            // UPGRADE: Inline Background & Text colors fixed
             return `
-            <div class="report-paper" style="background: white !important; color: black !important; margin: 0 auto;">
+            <div class="report-paper" style="margin:0 auto; padding:8mm; background:white; width:285mm; height:195mm; border:1px solid #eee; display:flex; flex-direction:column; justify-content:space-between; box-sizing: border-box;">
                 <div style="display:flex; justify-content:space-between; align-items:start;">
-                    <div style="font-size:10px; font-weight:bold; line-height:1.6; color:black;">
+                    <div style="font-size:10px; font-weight:bold; line-height:1.6; width:33%">
                         <p>ASSIGNED BY: ${data.assigned}</p>
                         <p>NAME: SM FAISAL AHMED</p>
                         <p>DESIGNATION: SENIOR SUPERVISOR</p>
                     </div>
-                    <div style="text-align:center;">
-                        <h1 style="font-size:22px; margin:0; color:black; font-weight:bold;">DHANMONDI SC</h1>
+                    <div style="text-align:center; width:33%">
+                        <h1 style="font-size:22px; margin:0; font-weight:bold; color:black;">DHANMONDI SC</h1>
                         <p style="font-size:9px; letter-spacing:3px; color:#2563eb; font-weight:bold;">DAILY ACTIVITY REPORT</p>
                     </div>
-                    <div style="text-align:right; font-size:10px; font-weight:bold; color:black;">DATE: ${data.date}</div>
+                    <div style="text-align:right; font-size:10px; font-weight:bold; width:33%">DATE: ${data.date}</div>
                 </div>
-                <table style="width:100%; border-collapse:collapse; border:1.5px solid black; font-size:10px; text-align:center; background:white;">
+                <table style="width:100%; border-collapse:collapse; border:1.5px solid black; font-size:10px; text-align:center;">
                     <thead style="background:#f1f5f9;">
                         <tr>
-                            <th style="border:1px solid black; color:black;">SL</th>
-                            <th style="border:1px solid black; color:black;">Client</th>
-                            <th style="border:1px solid black; color:black;">Site Code</th>
-                            <th style="border:1px solid black; color:black;">Work Details</th>
-                            <th style="border:1px solid black; color:black;">OP</th>
-                            <th style="border:1px solid black; color:black;">IM</th>
-                            <th style="border:1px solid black; color:black;">PM</th>
-                            <th style="border:1px solid black; color:black;">OT</th>
-                            <th style="border:1px solid black; color:black;">Remarks</th>
+                            <th style="border:1px solid black; width:4%">SL</th>
+                            <th style="border:1px solid black; width:10%">Client</th>
+                            <th style="border:1px solid black; width:12%">Site Code</th>
+                            <th style="border:1px solid black; width:34%">Work Details</th>
+                            <th style="border:1px solid black; width:7%">OP</th>
+                            <th style="border:1px solid black; width:7%">IM</th>
+                            <th style="border:1px solid black; width:7%">PM</th>
+                            <th style="border:1px solid black; width:7%">OT</th>
+                            <th style="border:1px solid black; width:12%">Remarks</th>
                         </tr>
                     </thead>
                     <tbody>${rHtml}</tbody>
                 </table>
                 <div style="display:flex; justify-content:space-between; padding:0 30px;">
-                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px; color:black;">SUBMITTED BY</div>
-                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px; color:black;">CHECKED BY</div>
-                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px; color:black;">RECEIVED BY</div>
+                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px;">SUBMITTED BY</div>
+                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px;">CHECKED BY</div>
+                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px;">RECEIVED BY</div>
                 </div>
             </div>`;
         }
