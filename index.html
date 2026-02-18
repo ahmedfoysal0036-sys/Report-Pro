@@ -3,217 +3,332 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AHMED_V11 | Professor Management</title>
+    <title>AHMED_V16 | Batch Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
-        body { font-family: 'Roboto', sans-serif; background: #f1f5f9; margin: 0; }
+        body { font-family: 'Roboto', sans-serif; background: #e2e8f0; margin: 0; padding: 0; overflow-x: hidden; }
         
-        @page { size: landscape; margin: 5mm; }
-        
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white; }
-            .report-paper { width: 100% !important; margin: 0 !important; padding: 4mm !important; box-shadow: none !important; border: none !important; }
-            th, td { border: 1.5px solid black !important; font-size: 10px !important; }
+        /* Mobile Scroll Fix */
+        .report-outer-container {
+            width: 100%;
+            overflow-x: auto;
+            padding: 10px 0;
+            display: flex;
+            justify-content: flex-start; /* Mobile-e left theke shuru hobe */
         }
 
+        /* --- CENTERED A4 LANDSCAPE LAYOUT --- */
         .report-paper { 
-            width: 290mm; 
-            min-height: 180mm; 
+            width: 285mm; 
+            height: 195mm; 
             background: white; 
-            margin: 15px auto; 
             padding: 8mm; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border-radius: 4px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            flex-shrink: 0; /* Prevents shrinking on mobile */
+            margin: auto; /* Centers in desktop */
         }
 
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 15px; }
-        th, td { border: 1px solid black; padding: 5px; text-align: center; font-size: 11px; vertical-align: middle; }
+        /* Table Styling */
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; border: 1.5px solid black; }
+        th, td { border: 1px solid black; padding: 4px; text-align: center; font-size: 11px; vertical-align: middle; }
         
-        .input-field { width: 100%; border: none; outline: none; background: transparent; text-align: center; font-family: inherit; font-size: 11px; }
-        .header-input { border-bottom: 1px solid black; outline: none; font-weight: bold; width: 190px; }
-        .editable-head { font-weight: bold; text-align: center; background: transparent; border: none; font-size: 9px; width: 100%; text-transform: uppercase; cursor: text; }
+        /* Inputs */
+        .input-field { width: 100%; border: none; outline: none; background: transparent; text-align: center; font-size: 11px; }
+        .header-input { border-bottom: 1px solid black; outline: none; font-weight: bold; background: transparent; }
         
-        .sig-box { border-top: 1.5px solid black; width: 170px; text-align: center; font-size: 10px; font-weight: bold; margin-top: 45px; }
+        /* Signature */
+        .sig-box { border-top: 1.5px solid black; width: 160px; text-align: center; font-size: 10px; font-weight: bold; margin-bottom: 10px; }
+
+        .html2pdf__page-break { page-break-before: always; }
+
+        @media print { .no-print { display: none !important; } }
+        
+        /* Desktop alignment */
+        @media (min-width: 300mm) {
+            .report-outer-container { justify-content: center; }
+        }
     </style>
 </head>
 <body>
 
-    <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 no-print flex justify-between items-center shadow-md">
-        <div class="flex items-center gap-3">
-            <i class="fas fa-user-tie text-blue-400 text-lg"></i>
-            <h1 class="font-bold text-xs tracking-widest uppercase">Ahmed_V11 | GitHub Live Edition</h1>
+    <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 no-print flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-layer-group text-amber-400"></i>
+            <h1 class="font-bold text-xs uppercase tracking-widest">Ahmed_V16 | Optimized</h1>
         </div>
         <div class="flex gap-2">
-            <button onclick="switchTab('entry')" class="bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded text-[10px] font-bold transition-all">ENTRY</button>
-            <button onclick="switchTab('history')" class="bg-slate-700 hover:bg-slate-600 px-4 py-1.5 rounded text-[10px] font-bold transition-all">HISTORY</button>
+            <button onclick="switchTab('entry')" class="bg-blue-600 px-3 py-1.5 rounded text-[10px] font-bold">ENTRY</button>
+            <button onclick="switchTab('history')" class="bg-slate-700 px-3 py-1.5 rounded text-[10px] font-bold">HISTORY DB</button>
         </div>
     </nav>
 
-    <div id="entrySection">
-        <div class="report-paper" id="mainReportArea">
-            <div class="flex justify-between items-start">
-                <div class="w-1/3 space-y-3">
-                    <p class="text-[11px] font-bold">ASSIGNED BY: <input type="text" id="assignedBy" class="header-input" value="MD AZMIR HOSSAIN"></p>
-                    <p class="text-[11px] font-bold">NAME: <input type="text" id="userName" class="header-input" style="width: 230px;" value="SM FAISAL AHMED"></p>
-                    <p class="text-[11px] font-bold">DESIGNATION: <input type="text" id="userDesig" class="header-input" value="SENIOR SUPERVISOR"></p>
-                </div>
-                
-                <div class="text-center">
-                    <h1 class="font-bold text-3xl uppercase text-slate-900 leading-none">Dhanmondi SC</h1>
-                    <p class="text-[10px] font-bold uppercase tracking-[0.4em] text-blue-500 mt-2">Daily Activity Report</p>
-                </div>
-                
-                <div class="w-1/3 text-right space-y-3">
-                    <p class="text-[11px] font-bold">DATE: <input type="date" id="reportDate" class="border rounded px-2 py-1 text-[11px] font-bold bg-slate-50"></p>
-                    <div class="flex justify-end gap-4 text-[11px] font-bold">
-                        <label class="cursor-pointer"><input type="checkbox" id="shiftDay" checked> DAY</label>
-                        <label class="cursor-pointer"><input type="checkbox" id="shiftNight"> NIGHT</label>
+    <div id="entrySection" class="hidden">
+        <div class="report-outer-container">
+            <div id="singleReportArea">
+                <div class="report-paper">
+                    <div class="flex justify-between items-start">
+                        <div class="w-1/3 space-y-2">
+                            <p class="text-[11px] font-bold uppercase">ASSIGNED BY: <input type="text" id="assignedBy" class="header-input w-40" value="MD AZMIR HOSSAIN"></p>
+                            <p class="text-[11px] font-bold uppercase">NAME: <input type="text" id="userName" class="header-input w-48" value="SM FAISAL AHMED"></p>
+                            <p class="text-[11px] font-bold uppercase">DESIGNATION: <input type="text" id="userDesig" class="header-input w-40" value="SENIOR SUPERVISOR"></p>
+                        </div>
+                        <div class="text-center">
+                            <h1 class="font-bold text-2xl uppercase text-slate-900">Dhanmondi SC</h1>
+                            <p class="text-[10px] font-bold uppercase tracking-[0.3em] text-blue-600">Daily Activity Report</p>
+                        </div>
+                        <div class="w-1/3 text-right space-y-2">
+                            <p class="text-[11px] font-bold">DATE: <input type="date" id="reportDate" class="border rounded px-1 font-bold"></p>
+                            <div class="flex justify-end gap-3 text-[10px] font-bold">
+                                <label><input type="checkbox" id="shiftDay" checked> DAY</label>
+                                <label><input type="checkbox" id="shiftNight"> NIGHT</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table id="mainTable">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="w-[4%]">SL</th>
+                                <th class="w-[10%]">Client</th>
+                                <th class="w-[12%]">Site Code</th>
+                                <th class="w-[34%]">Work Details</th>
+                                <th class="w-[7%] text-[9px]">Operation</th>
+                                <th class="w-[7%] text-[9px]">Implementation</th>
+                                <th class="w-[7%] text-[9px]">PM</th>
+                                <th class="w-[7%] text-[9px]">Others</th>
+                                <th class="w-[12%]">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+
+                    <div class="flex justify-between px-8">
+                        <div class="sig-box">SUBMITTED BY</div>
+                        <div class="sig-box">CHECKED BY</div>
+                        <div class="sig-box">RECEIVED BY</div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <table id="mainTable">
-                <thead class="bg-slate-100">
-                    <tr>
-                        <th class="w-[4%]">SL</th>
-                        <th class="w-[10%]">Client</th>
-                        <th class="w-[12%]">Site Code</th>
-                        <th class="w-[34%]">Work Details</th>
-                        <th class="w-[7%]"><input type="text" class="editable-head" value="Operation"></th>
-                        <th class="w-[7%]"><input type="text" class="editable-head" value="Implementation"></th>
-                        <th class="w-[7%]"><input type="text" class="editable-head" value="PM"></th>
-                        <th class="w-[7%]"><input type="text" class="editable-head" value="Others"></th>
-                        <th class="w-[12%]">Remarks</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    </tbody>
-            </table>
+        <div class="fixed bottom-5 right-5 flex flex-col gap-2 no-print">
+            <button onclick="saveCurrentData()" class="bg-amber-500 hover:bg-amber-600 text-white p-4 rounded-full shadow-xl">
+                <i class="fas fa-save text-xl"></i>
+            </button>
+        </div>
+    </div>
 
-            <div class="flex justify-between mt-12 px-12">
-                <div class="sig-box">SUBMITTED BY</div>
-                <div class="sig-box">CHECKED BY</div>
-                <div class="sig-box">RECEIVED BY</div>
+    <div id="historySection" class="p-4 max-w-5xl mx-auto min-h-screen no-print">
+        <div class="bg-white rounded-xl shadow-lg border p-6">
+            <div class="flex justify-between items-center mb-6 pb-4 border-b">
+                <h2 class="font-bold text-xl text-slate-800"><i class="fas fa-database text-blue-500 mr-2"></i>History Log</h2>
+                <div class="flex gap-2">
+                    <button onclick="selectAll()" class="text-blue-600 text-xs font-bold hover:underline">Select All</button>
+                    <span class="text-gray-300">|</span>
+                    <button onclick="clearHistory()" class="text-red-500 text-xs font-bold hover:underline">Clear All</button>
+                </div>
+            </div>
+            <div id="historyList" class="space-y-3 mb-24"></div>
+        </div>
+
+        <div class="fixed bottom-0 left-0 w-full bg-white border-t p-4 shadow-2xl flex justify-between items-center z-50">
+            <span id="selectCount" class="font-bold text-slate-600 text-sm ml-4">0 Selected</span>
+            <div class="flex gap-2 mr-4">
+                <button onclick="processBatchPDF(true)" class="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-[10px] shadow-lg flex items-center gap-1">
+                    <i class="fab fa-telegram-plane"></i> SEND
+                </button>
+                <button onclick="processBatchPDF(false)" class="bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-[10px] shadow-lg flex items-center gap-1">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </button>
             </div>
         </div>
-
-        <div class="max-w-4xl mx-auto flex flex-wrap gap-4 justify-center py-10 no-print px-4">
-            <button onclick="sendToTelegramExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-bold text-xs shadow-xl flex items-center gap-2 transform active:scale-95 transition-all">
-                <i class="fab fa-telegram-plane text-lg"></i> PUSH TO TELEGRAM
-            </button>
-            <button onclick="downloadPerfectExcel()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold text-xs shadow-xl flex items-center gap-2 transform active:scale-95 transition-all">
-                <i class="fas fa-file-excel text-lg"></i> DOWNLOAD EXCEL
-            </button>
-            <button onclick="window.print()" class="bg-slate-800 hover:bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-xs shadow-xl flex items-center gap-2">
-                <i class="fas fa-print text-lg"></i> PRINT REPORT
-            </button>
-        </div>
     </div>
 
-    <div id="historySection" class="hidden p-8 max-w-4xl mx-auto no-print">
-        <div class="bg-white p-6 rounded-2xl shadow-xl border">
-            <h2 class="font-bold text-lg text-slate-800 mb-6 flex items-center gap-2">
-                <i class="fas fa-database text-blue-500"></i> Local Storage History
-            </h2>
-            <div id="historyList" class="space-y-3"></div>
-        </div>
-    </div>
+    <div id="batchContainer" class="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none"></div>
 
     <script>
         const botToken = "8582534427:AAHq4TfwFqBIy1wU9mp6bDNQGSeSD49yX94";
         const chatId = "682844989";
         
-        // Auto-date initialization
         document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+        initRows();
+        switchTab('entry');
 
-        // Generate 10 Slim Rows
         function initRows() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
             for(let i=1; i<=10; i++) {
                 tbody.innerHTML += `
                     <tr>
-                        <td class="h-10 font-bold text-slate-700">${i}</td>
+                        <td class="h-10 font-bold">${i}</td>
                         <td><input type="text" class="input-field client"></td>
                         <td><input type="text" class="input-field site font-bold text-blue-800 uppercase"></td>
-                        <td><input type="text" class="input-field text-left px-2 work-desc"></td>
-                        <td><input type="checkbox" class="cb scale-150"></td>
-                        <td><input type="checkbox" class="cb scale-150"></td>
-                        <td><input type="checkbox" class="cb scale-150"></td>
-                        <td><input type="checkbox" class="cb scale-150"></td>
-                        <td><input type="text" class="input-field remarks px-2"></td>
-                    </tr>
-                `;
+                        <td><input type="text" class="input-field text-left px-1 work"></td>
+                        <td><input type="checkbox" class="cb1 scale-125"></td>
+                        <td><input type="checkbox" class="cb2 scale-125"></td>
+                        <td><input type="checkbox" class="cb3 scale-125"></td>
+                        <td><input type="checkbox" class="cb4 scale-125"></td>
+                        <td><input type="text" class="input-field remarks"></td>
+                    </tr>`;
             }
         }
-        initRows();
 
         function switchTab(tab) {
-            document.getElementById('entrySection').classList.toggle('hidden', tab !== 'entry');
-            document.getElementById('historySection').classList.toggle('hidden', tab !== 'history');
+            document.getElementById('entrySection').style.display = tab === 'entry' ? 'block' : 'none';
+            document.getElementById('historySection').style.display = tab === 'history' ? 'block' : 'none';
             if(tab === 'history') renderHistory();
         }
 
-        // --- THE MAGIC FIX: Pre-processing Table for Excel ---
-        function getReadyClone() {
-            const original = document.getElementById('mainReportArea');
-            const clone = original.cloneNode(true);
-            
-            // Sync Text Inputs
-            const originalInputs = original.querySelectorAll('input[type="text"]');
-            clone.querySelectorAll('input[type="text"]').forEach((input, i) => {
-                const span = document.createElement('span');
-                span.innerText = originalInputs[i].value;
-                input.parentNode.replaceChild(span, input);
-            });
-            
-            // Sync Checkboxes to Ticks
-            const originalChecks = original.querySelectorAll('input[type="checkbox"]');
-            clone.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
-                const span = document.createElement('span');
-                span.innerText = originalChecks[i].checked ? "✔" : "";
-                cb.parentNode.replaceChild(span, cb);
-            });
-
-            // Date Input Fix
-            const dateVal = document.getElementById('reportDate').value;
-            const dateInp = clone.querySelector('#reportDate');
-            if(dateInp) dateInp.parentNode.innerText = "DATE: " + dateVal;
-
-            return clone;
-        }
-
-        function downloadPerfectExcel() {
-            const tableClone = getReadyClone();
-            const wb = XLSX.utils.table_to_book(tableClone);
-            XLSX.writeFile(wb, `Ahmed_Report_${document.getElementById('reportDate').value}.xlsx`);
-        }
-
-        async function sendToTelegramExcel() {
-            const tableClone = getReadyClone();
-            const wb = XLSX.utils.table_to_book(tableClone);
-            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-            const formData = new FormData();
-            formData.append('chat_id', chatId);
-            formData.append('document', blob, `Report_${document.getElementById('reportDate').value}.xlsx`);
-            formData.append('caption', `📊 Daily Report Received\n📅 Date: ${document.getElementById('reportDate').value}\n👤 User: Faisal Ahmed`);
-
-            try {
-                const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
-                if(res.ok) alert("✅ Success! Excel file sent to Telegram.");
-                else alert("❌ GitHub/Telegram Security Blocked the Push. Try in Safari.");
-            } catch (e) { alert("Network Error. Check internet."); }
+        function saveCurrentData() {
+            const data = {
+                id: Date.now(),
+                date: document.getElementById('reportDate').value,
+                assigned: document.getElementById('assignedBy').value,
+                rows: Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
+                    client: tr.querySelector('.client').value,
+                    site: tr.querySelector('.site').value,
+                    work: tr.querySelector('.work').value,
+                    c1: tr.querySelector('.cb1').checked,
+                    c2: tr.querySelector('.cb2').checked,
+                    c3: tr.querySelector('.cb3').checked,
+                    c4: tr.querySelector('.cb4').checked,
+                    rem: tr.querySelector('.remarks').value
+                }))
+            };
+            let history = JSON.parse(localStorage.getItem('prof_v16_db')) || [];
+            history.push(data);
+            localStorage.setItem('prof_v16_db', JSON.stringify(history));
+            alert("✅ Saved!");
+            switchTab('history');
         }
 
         function renderHistory() {
             const list = document.getElementById('historyList');
-            list.innerHTML = `<p class="text-slate-400 text-sm italic">Local storage auto-saves on Telegram Push.</p>`;
+            let history = JSON.parse(localStorage.getItem('prof_v16_db')) || [];
+            if(history.length === 0) { list.innerHTML = '<p class="text-center py-10">Empty</p>'; return; }
+            list.innerHTML = history.reverse().map(h => `
+                <div class="flex items-center gap-3 p-3 bg-slate-50 border rounded-lg">
+                    <input type="checkbox" class="history-chk w-5 h-5" value="${h.id}" onchange="updateCount()">
+                    <div class="flex-1 cursor-pointer" onclick="loadReport(${h.id})">
+                        <p class="font-bold text-sm">📅 ${h.date}</p>
+                        <p class="text-[10px] text-gray-500 uppercase">${h.assigned}</p>
+                    </div>
+                    <button onclick="loadReport(${h.id})" class="text-blue-600 text-[10px] font-bold">EDIT</button>
+                </div>`).join('');
+            updateCount();
+        }
+
+        function loadReport(id) {
+            let history = JSON.parse(localStorage.getItem('prof_v16_db')) || [];
+            const h = history.find(item => item.id == id);
+            if(!h) return;
+            document.getElementById('reportDate').value = h.date;
+            document.getElementById('assignedBy').value = h.assigned;
+            const rows = document.querySelectorAll('#tableBody tr');
+            h.rows.forEach((r, i) => {
+                rows[i].querySelector('.client').value = r.client;
+                rows[i].querySelector('.site').value = r.site;
+                rows[i].querySelector('.work').value = r.work;
+                rows[i].querySelector('.cb1').checked = r.c1;
+                rows[i].querySelector('.cb2').checked = r.c2;
+                rows[i].querySelector('.cb3').checked = r.c3;
+                rows[i].querySelector('.cb4').checked = r.c4;
+                rows[i].querySelector('.remarks').value = r.rem;
+            });
+            switchTab('entry');
+        }
+
+        function updateCount() {
+            const count = document.querySelectorAll('.history-chk:checked').length;
+            document.getElementById('selectCount').innerText = `${count} Selected`;
+        }
+        function selectAll() { document.querySelectorAll('.history-chk').forEach(cb => cb.checked = true); updateCount(); }
+        function clearHistory() { if(confirm("Clear?")) { localStorage.removeItem('prof_v16_db'); renderHistory(); } }
+
+        async function processBatchPDF(sendToTelegram) {
+            const checkedBoxes = document.querySelectorAll('.history-chk:checked');
+            if(checkedBoxes.length === 0) { alert("Select first!"); return; }
+            const container = document.getElementById('batchContainer');
+            container.innerHTML = '';
+            let history = JSON.parse(localStorage.getItem('prof_v16_db')) || [];
+            
+            checkedBoxes.forEach((cb, idx) => {
+                const data = history.find(h => h.id == cb.value);
+                if(data) {
+                    container.innerHTML += generateReportHTML(data);
+                    if(idx < checkedBoxes.length - 1) container.innerHTML += '<div class="html2pdf__page-break"></div>';
+                }
+            });
+
+            const opt = {
+                margin: 0, filename: `Reports.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            try {
+                if (sendToTelegram) {
+                    const pdfBlob = await html2pdf().set(opt).from(container).output('blob');
+                    const fd = new FormData();
+                    fd.append('chat_id', chatId);
+                    fd.append('document', pdfBlob, `Reports.pdf`);
+                    await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: fd });
+                    alert("✅ Sent!");
+                } else {
+                    html2pdf().set(opt).from(container).save();
+                }
+            } catch (err) { alert(err.message); }
+        }
+
+        function generateReportHTML(data) {
+            let rHtml = '';
+            for(let i=0; i<10; i++) {
+                const r = data.rows[i] || {};
+                rHtml += `<tr>
+                    <td style="height:38px; font-weight:bold; border:1px solid black;">${i+1}</td>
+                    <td style="border:1px solid black;">${r.client||''}</td>
+                    <td style="border:1px solid black; font-weight:bold; color:#1e40af;">${r.site||''}</td>
+                    <td style="border:1px solid black; text-align:left; padding-left:4px;">${r.work||''}</td>
+                    <td style="border:1px solid black;">${r.c1?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.c2?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.c3?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.c4?'✔':''}</td>
+                    <td style="border:1px solid black;">${r.rem||''}</td>
+                </tr>`;
+            }
+            return `<div class="report-paper" style="margin:0 auto; padding:8mm; background:white; width:285mm; height:195mm; border:1px solid #eee; display:flex; flex-direction:column; justify-content:space-between;">
+                <div style="display:flex; justify-content:space-between; align-items:start;">
+                    <div style="font-size:10px; font-weight:bold; line-height:1.6;">
+                        <p>ASSIGNED BY: ${data.assigned}</p>
+                        <p>NAME: SM FAISAL AHMED</p>
+                        <p>DESIGNATION: SENIOR SUPERVISOR</p>
+                    </div>
+                    <div style="text-align:center;">
+                        <h1 style="font-size:22px; margin:0;">DHANMONDI SC</h1>
+                        <p style="font-size:9px; letter-spacing:3px; color:#2563eb;">DAILY ACTIVITY REPORT</p>
+                    </div>
+                    <div style="text-align:right; font-size:10px; font-weight:bold;">DATE: ${data.date}</div>
+                </div>
+                <table style="width:100%; border-collapse:collapse; border:1.5px solid black; font-size:10px; text-align:center;">
+                    <thead style="background:#f1f5f9;">
+                        <tr><th style="border:1px solid black;">SL</th><th style="border:1px solid black;">Client</th><th style="border:1px solid black;">Site Code</th><th style="border:1px solid black;">Work Details</th><th style="border:1px solid black;">OP</th><th style="border:1px solid black;">IM</th><th style="border:1px solid black;">PM</th><th style="border:1px solid black;">OT</th><th style="border:1px solid black;">Remarks</th></tr>
+                    </thead>
+                    <tbody>${rHtml}</tbody>
+                </table>
+                <div style="display:flex; justify-content:space-between; padding:0 30px;">
+                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px;">SUBMITTED BY</div>
+                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px;">CHECKED BY</div>
+                    <div style="border-top:1px solid black; width:140px; text-align:center; font-size:9px; font-weight:bold; padding-top:5px;">RECEIVED BY</div>
+                </div>
+            </div>`;
         }
     </script>
 </body>
