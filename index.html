@@ -32,11 +32,9 @@
             text-transform: uppercase;
         }
 
-        /* প্রিন্ট ফিক্স */
         @media print { 
             .no-print { display: none !important; }
             body { background: white !important; padding: 0 !important; margin: 0 !important; }
-            /* প্রিন্টের সময় মেইন কন্টেন্ট হাইড করে শুধু প্রিন্ট কন্টেইনার দেখাবে */
             body > *:not(#printContainer) { display: none !important; }
             #printContainer { display: block !important; width: 100% !important; }
             .print-page-break { page-break-after: always; display: block !important; }
@@ -67,6 +65,8 @@
     <div id="entrySection" class="p-6">
         <div id="mainReportArea">
             <div class="report-paper shadow-2xl rounded-sm">
+                <input type="hidden" id="editingId" value="">
+
                 <div class="text-center mb-6">
                     <h1 class="sc-title">DHANMONDI SC</h1>
                     <p class="text-[11px] font-bold tracking-[0.6em] uppercase text-slate-500 mt-1">Daily Activity Report</p>
@@ -82,9 +82,15 @@
                         </div>
                     </div>
 
-                    <div class="w-1/3 text-right">
-                        <p class="text-[12px] font-bold mb-3">DATE: <input type="date" id="reportDate" class="border-b border-black px-1 font-bold text-sm bg-transparent outline-none"></p>
-                        <div class="flex justify-end gap-5 text-[11px] font-bold no-print">
+                    <div class="w-2/5 text-right space-y-2">
+                        <div class="flex justify-end items-center gap-2">
+                            <p class="text-[12px] font-bold">DATE: <input type="date" id="reportDate" class="border-b border-black px-1 font-bold text-sm bg-transparent outline-none w-32"></p>
+                        </div>
+                        <div class="flex justify-end items-center gap-3">
+                            <p class="text-[11px] font-bold">START: <input type="time" id="startTime" class="border-b border-black text-[11px] font-bold bg-transparent outline-none"></p>
+                            <p class="text-[11px] font-bold">END: <input type="time" id="endTime" class="border-b border-black text-[11px] font-bold bg-transparent outline-none"></p>
+                        </div>
+                        <div class="flex justify-end gap-5 text-[11px] font-bold no-print pt-1">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="radio" name="shiftOpt" id="shiftDay" checked class="w-4 h-4 accent-black"> DAY
                             </label>
@@ -106,7 +112,7 @@
                             <th style="width: 100px;">Implementation</th>
                             <th style="width: 50px;">PM</th>
                             <th style="width: 60px;">Others</th>
-                            <th>Team/assign</th>
+                            <th>Assign/team</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -120,9 +126,14 @@
             </div>
         </div>
         
-        <button onclick="saveData()" class="fixed bottom-10 right-10 bg-amber-500 text-white w-16 h-16 rounded-full shadow-2xl no-print flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
-            <i class="fas fa-save text-2xl"></i>
-        </button>
+        <div class="fixed bottom-10 right-10 flex flex-col gap-3 no-print">
+            <button onclick="init()" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700 transition-all">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button onclick="saveData()" class="bg-amber-500 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
+                <i class="fas fa-save text-2xl"></i>
+            </button>
+        </div>
     </div>
 
     <div id="historySection" class="hidden p-6 max-w-4xl mx-auto no-print">
@@ -149,6 +160,7 @@
         const DB_KEY = 'prof_stable_v26_final';
 
         function init() {
+            document.getElementById('editingId').value = "";
             const tb = document.getElementById('tableBody');
             tb.innerHTML = '';
             for(let i=1; i<=10; i++) {
@@ -165,6 +177,8 @@
                 </tr>`;
             }
             document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('startTime').value = "09:00";
+            document.getElementById('endTime').value = "18:00";
         }
         init();
 
@@ -175,25 +189,66 @@
         }
 
         function saveData() {
+            const editingId = document.getElementById('editingId').value;
             const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
                 c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
                 w: tr.querySelector('.work').value, r: tr.querySelector('.rem').value,
                 b1: tr.querySelector('.c1').checked, b2: tr.querySelector('.c2').checked,
                 b3: tr.querySelector('.c3').checked, b4: tr.querySelector('.c4').checked
             }));
+
             const data = { 
-                id: Date.now(), 
+                id: editingId ? parseInt(editingId) : Date.now(), 
                 date: document.getElementById('reportDate').value, 
+                startTime: document.getElementById('startTime').value,
+                endTime: document.getElementById('endTime').value,
                 hr: document.getElementById('hrId').value, 
                 assigned: document.getElementById('assignedBy').value,
                 shift: document.getElementById('shiftDay').checked ? 'DAY' : 'NIGHT',
                 rows 
             };
+
             let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            db.push(data);
+            if (editingId) {
+                const index = db.findIndex(x => x.id == editingId);
+                if (index !== -1) db[index] = data;
+            } else { db.push(data); }
+
             localStorage.setItem(DB_KEY, JSON.stringify(db));
-            alert("V26 Final: Report Saved.");
+            alert(editingId ? "Report Updated Successfully." : "V26 Final: Report Saved.");
+            init();
             switchTab('history');
+        }
+
+        function editReport(id) {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const data = db.find(x => x.id == id);
+            if (!data) return;
+
+            switchTab('entry');
+            document.getElementById('editingId').value = data.id;
+            document.getElementById('reportDate').value = data.date;
+            document.getElementById('startTime').value = data.startTime || "";
+            document.getElementById('endTime').value = data.endTime || "";
+            document.getElementById('assignedBy').value = data.assigned;
+            document.getElementById('hrId').value = data.hr;
+            
+            if(data.shift === 'DAY') document.getElementById('shiftDay').checked = true;
+            else document.getElementById('shiftNight').checked = true;
+
+            const tableRows = document.querySelectorAll('#tableBody tr');
+            data.rows.forEach((row, i) => {
+                if(tableRows[i]) {
+                    tableRows[i].querySelector('.client').value = row.c;
+                    tableRows[i].querySelector('.site').value = row.s;
+                    tableRows[i].querySelector('.work').value = row.w;
+                    tableRows[i].querySelector('.rem').value = row.r;
+                    tableRows[i].querySelector('.c1').checked = row.b1;
+                    tableRows[i].querySelector('.c2').checked = row.b2;
+                    tableRows[i].querySelector('.c3').checked = row.b3;
+                    tableRows[i].querySelector('.c4').checked = row.b4;
+                }
+            });
         }
 
         function renderHistory() {
@@ -202,11 +257,11 @@
             if(db.length === 0) { list.innerHTML = `<p class="text-center text-slate-500 py-10">No records found.</p>`; return; }
             list.innerHTML = db.slice().reverse().map(h => `
                 <div class="bg-white p-4 rounded-xl shadow-sm flex items-center justify-between border-l-4 border-amber-500">
-                    <div class="flex items-center gap-4">
-                        <input type="checkbox" class="db-chk h-6 w-6 accent-black cursor-pointer" value="${h.id}">
+                    <div class="flex items-center gap-4 flex-1 cursor-pointer" onclick="editReport(${h.id})">
+                        <input type="checkbox" class="db-chk h-6 w-6 accent-black cursor-pointer" value="${h.id}" onclick="event.stopPropagation()">
                         <div>
-                            <p class="font-bold text-sm text-slate-800">${h.date}</p>
-                            <p class="text-[10px] font-bold text-blue-600 uppercase">Shift: ${h.shift}</p>
+                            <p class="font-bold text-sm text-slate-800">${h.date} (${h.startTime || 'N/A'} - ${h.endTime || 'N/A'}) <span class="ml-2 text-[10px] text-amber-600 border border-amber-200 px-1 rounded">EDIT</span></p>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase">Shift: ${h.shift} | Assigned: ${h.assigned}</p>
                         </div>
                     </div>
                     <button class="text-red-400 hover:text-red-600 p-2" onclick="deleteItem(${h.id})"><i class="fas fa-trash"></i></button>
@@ -236,10 +291,7 @@
                 page.innerHTML = generatePrintHTML(data);
                 printCont.appendChild(page);
             });
-
-            setTimeout(() => {
-                window.print();
-            }, 500);
+            setTimeout(() => { window.print(); }, 500);
         }
 
         async function generateFinalPDF(isTelegram) {
@@ -275,7 +327,7 @@
 
         function generatePrintHTML(data) {
             const getCircle = (checked) => `
-                <div style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1.5px solid black; border-radius:50%; margin:auto;">
+                <div style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1px solid black; border-radius:50%; margin:auto;">
                     ${checked ? '<div style="width:10px; height:10px; background:black; border-radius:50%;"></div>' : ''}
                 </div>`;
 
@@ -308,7 +360,8 @@
                     </div>
                     <div style="text-align:right; font-size:13px;">
                         <b>DATE:</b> ${data.date}<br>
-                        <div style="margin-top:8px;">
+                        <b>TIME:</b> ${data.startTime || '00:00'} - ${data.endTime || '00:00'}<br>
+                        <div style="margin-top:5px;">
                             <b style="font-size:16px; text-transform:uppercase; font-weight:700;">SHIFT: ${data.shift}</b>
                         </div>
                     </div>
