@@ -7,40 +7,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        
-        .report-paper { 
-            width: 297mm; min-height: 210mm; padding: 12mm; background: white; 
-            margin: auto; color: black; position: relative;
-        }
-        
+        .report-paper { width: 297mm; min-height: 210mm; padding: 12mm; background: white; margin: auto; color: black; position: relative; }
         table { width: 100%; border-collapse: collapse; border: 2px solid black; table-layout: fixed; }
         th, td { border: 1.5px solid black; padding: 0; text-align: center; font-size: 11px; height: 32px; vertical-align: middle; }
-        
         .header-input { border: none; outline: none; font-weight: bold; font-size: 12px; background: transparent; }
         .table-input { border: none; outline: none; width: 100%; text-align: center; font-size: 11px; background: transparent; height: 100%; padding: 0 5px; }
-        
-        .sc-title {
-            font-size: 42px; 
-            font-weight: 400;
-            margin: 0;
-            color: black;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        @media print { 
-            .no-print { display: none !important; }
-            body { background: white !important; padding: 0 !important; margin: 0 !important; }
-            body > *:not(#printContainer) { display: none !important; }
-            #printContainer { display: block !important; width: 100% !important; }
-            .print-page-break { page-break-after: always; display: block !important; }
-            @page { size: landscape; margin: 0; }
-        }
-
+        .sc-title { font-size: 42px; font-weight: 400; margin: 0; color: black; letter-spacing: 2px; text-transform: uppercase; }
+        @media print { .no-print { display: none !important; } body { background: white !important; } #printContainer { display: block !important; width: 100% !important; } .print-page-break { page-break-after: always; display: block !important; } @page { size: landscape; margin: 0; } }
         #printContainer { display: none; }
     </style>
 </head>
@@ -48,7 +27,7 @@
 
     <div id="loader" class="fixed inset-0 bg-black/90 z-[9999] hidden flex-col items-center justify-center text-white">
         <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-amber-500 mb-4"></div>
-        <p class="font-bold tracking-tighter uppercase text-sm">Processing High-Quality Report...</p>
+        <p class="font-bold tracking-tighter uppercase text-sm">Processing Cloud Sync...</p>
     </div>
 
     <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 no-print flex justify-between items-center shadow-lg">
@@ -66,12 +45,10 @@
         <div id="mainReportArea">
             <div class="report-paper shadow-2xl rounded-sm">
                 <input type="hidden" id="editingId" value="">
-
                 <div class="text-center mb-6">
                     <h1 class="sc-title">DHANMONDI SC</h1>
                     <p class="text-[11px] font-bold tracking-[0.6em] uppercase text-slate-500 mt-1">Daily Activity Report</p>
                 </div>
-
                 <div class="flex justify-between items-start mb-6">
                     <div class="w-1/3 space-y-1">
                         <p class="text-[12px] font-bold uppercase">ASSIGNED BY: <input type="text" id="assignedBy" class="header-input w-48 border-b border-gray-100" value="MD AZMIR HOSSAIN"></p>
@@ -81,7 +58,6 @@
                             <p class="text-[12px] font-bold uppercase">DESIG: <input type="text" id="userDesig" class="header-input w-52" value="SENIOR SUPERVISOR"></p>
                         </div>
                     </div>
-
                     <div class="w-2/5 text-right space-y-2">
                         <div class="flex justify-end items-center gap-2">
                             <p class="text-[12px] font-bold">DATE: <input type="date" id="reportDate" class="border-b border-black px-1 font-bold text-sm bg-transparent outline-none w-32"></p>
@@ -100,7 +76,6 @@
                         </div>
                     </div>
                 </div>
-
                 <table>
                     <thead class="bg-gray-50">
                         <tr class="h-10">
@@ -117,7 +92,6 @@
                     </thead>
                     <tbody id="tableBody"></tbody>
                 </table>
-
                 <div class="flex justify-between mt-20 px-12">
                     <div class="border-t-2 border-black w-48 text-center text-[11px] font-bold pt-2 uppercase">Submitted By</div>
                     <div class="border-t-2 border-black w-48 text-center text-[11px] font-bold pt-2 uppercase">Checked By</div>
@@ -125,9 +99,8 @@
                 </div>
             </div>
         </div>
-        
         <div class="fixed bottom-10 right-10 flex flex-col gap-3 no-print">
-            <button onclick="init()" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700 transition-all">
+            <button onclick="init()" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700">
                 <i class="fas fa-plus"></i>
             </button>
             <button onclick="saveData()" class="bg-amber-500 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
@@ -138,23 +111,25 @@
 
     <div id="historySection" class="hidden p-6 max-w-4xl mx-auto no-print">
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-slate-800 font-black text-xl uppercase">Saved History</h2>
+            <h2 class="text-slate-800 font-black text-xl uppercase">Saved History (Cloud Sync)</h2>
             <button onclick="toggleSelectAll()" id="selBtn" class="bg-slate-200 text-slate-700 px-3 py-1 rounded text-[10px] font-bold uppercase">Select All</button>
         </div>
         <div id="historyList" class="space-y-3 mb-24"></div>
-        
         <div class="fixed bottom-0 left-0 w-full bg-white/80 backdrop-blur-md p-6 flex justify-center gap-3 border-t border-slate-200">
             <button onclick="generateFinalPDF(true)" class="bg-blue-700 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow-lg">Telegram</button>
             <button onclick="generateFinalPDF(false)" class="bg-slate-800 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow-lg">Download PDF</button>
-            <button onclick="directPrint()" class="bg-amber-500 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow-lg">
-                <i class="fas fa-print mr-1"></i> Print
-            </button>
+            <button onclick="directPrint()" class="bg-amber-500 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow-lg"><i class="fas fa-print mr-1"></i> Print</button>
         </div>
     </div>
 
     <div id="printContainer"></div>
 
     <script>
+        // --- Firebase Configuration ---
+        const firebaseConfig = { databaseURL: "https://infinite-v1-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const dbRef = firebase.database().ref('reports');
+
         const botToken = "8582534427:AAHq4TfwFqBIy1wU9mp6bDNQGSeSD49yX94";
         const chatId = "682844989";
         const DB_KEY = 'prof_stable_v26_final';
@@ -182,13 +157,24 @@
         }
         init();
 
+        // Load data from Firebase on Start
+        dbRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                const reportsArray = Object.keys(data).map(key => data[key]);
+                localStorage.setItem(DB_KEY, JSON.stringify(reportsArray));
+                if(document.getElementById('historySection').classList.contains('hidden') === false) renderHistory();
+            }
+        });
+
         function switchTab(t) {
             document.getElementById('entrySection').classList.toggle('hidden', t !== 'entry');
             document.getElementById('historySection').classList.toggle('hidden', t !== 'history');
             if(t === 'history') renderHistory();
         }
 
-        function saveData() {
+        async function saveData() {
+            document.getElementById('loader').style.display = 'flex';
             const editingId = document.getElementById('editingId').value;
             const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
                 c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
@@ -197,8 +183,9 @@
                 b3: tr.querySelector('.c3').checked, b4: tr.querySelector('.c4').checked
             }));
 
+            const dataId = editingId ? editingId : Date.now().toString();
             const data = { 
-                id: editingId ? parseInt(editingId) : Date.now(), 
+                id: dataId, 
                 date: document.getElementById('reportDate').value, 
                 startTime: document.getElementById('startTime').value,
                 endTime: document.getElementById('endTime').value,
@@ -208,23 +195,37 @@
                 rows 
             };
 
-            let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            if (editingId) {
-                const index = db.findIndex(x => x.id == editingId);
-                if (index !== -1) db[index] = data;
-            } else { db.push(data); }
+            try {
+                await dbRef.child(dataId).set(data);
+                alert("Saved to Cloud Successfully!");
+                init();
+                switchTab('history');
+            } catch (e) { alert("Cloud Error: " + e.message); }
+            document.getElementById('loader').style.display = 'none';
+        }
 
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
-            alert(editingId ? "Report Updated Successfully." : "V26 Final: Report Saved.");
-            init();
-            switchTab('history');
+        function renderHistory() {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const list = document.getElementById('historyList');
+            if(db.length === 0) { list.innerHTML = `<p class="text-center text-slate-500 py-10">No records found.</p>`; return; }
+            list.innerHTML = db.slice().reverse().map(h => `
+                <div class="bg-white p-4 rounded-xl shadow-sm flex items-center justify-between border-l-4 border-amber-500">
+                    <div class="flex items-center gap-4 flex-1 cursor-pointer" onclick="editReport('${h.id}')">
+                        <input type="checkbox" class="db-chk h-6 w-6 accent-black" value="${h.id}" onclick="event.stopPropagation()">
+                        <div>
+                            <p class="font-bold text-sm text-slate-800">${h.date} (${h.startTime || 'N/A'} - ${h.endTime || 'N/A'}) <span class="ml-2 text-[10px] text-amber-600 border border-amber-200 px-1 rounded">EDIT</span></p>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase">Shift: ${h.shift} | Assigned: ${h.assigned}</p>
+                        </div>
+                    </div>
+                    <button class="text-red-400 hover:text-red-600 p-2" onclick="deleteItem('${h.id}')"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
         }
 
         function editReport(id) {
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             const data = db.find(x => x.id == id);
             if (!data) return;
-
             switchTab('entry');
             document.getElementById('editingId').value = data.id;
             document.getElementById('reportDate').value = data.date;
@@ -232,10 +233,8 @@
             document.getElementById('endTime').value = data.endTime || "";
             document.getElementById('assignedBy').value = data.assigned;
             document.getElementById('hrId').value = data.hr;
-            
             if(data.shift === 'DAY') document.getElementById('shiftDay').checked = true;
             else document.getElementById('shiftNight').checked = true;
-
             const tableRows = document.querySelectorAll('#tableBody tr');
             data.rows.forEach((row, i) => {
                 if(tableRows[i]) {
@@ -251,22 +250,14 @@
             });
         }
 
-        function renderHistory() {
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const list = document.getElementById('historyList');
-            if(db.length === 0) { list.innerHTML = `<p class="text-center text-slate-500 py-10">No records found.</p>`; return; }
-            list.innerHTML = db.slice().reverse().map(h => `
-                <div class="bg-white p-4 rounded-xl shadow-sm flex items-center justify-between border-l-4 border-amber-500">
-                    <div class="flex items-center gap-4 flex-1 cursor-pointer" onclick="editReport(${h.id})">
-                        <input type="checkbox" class="db-chk h-6 w-6 accent-black cursor-pointer" value="${h.id}" onclick="event.stopPropagation()">
-                        <div>
-                            <p class="font-bold text-sm text-slate-800">${h.date} (${h.startTime || 'N/A'} - ${h.endTime || 'N/A'}) <span class="ml-2 text-[10px] text-amber-600 border border-amber-200 px-1 rounded">EDIT</span></p>
-                            <p class="text-[10px] font-bold text-blue-600 uppercase">Shift: ${h.shift} | Assigned: ${h.assigned}</p>
-                        </div>
-                    </div>
-                    <button class="text-red-400 hover:text-red-600 p-2" onclick="deleteItem(${h.id})"><i class="fas fa-trash"></i></button>
-                </div>
-            `).join('');
+        function deleteItem(id) { 
+            if(confirm("Delete from Cloud?")) { 
+                dbRef.child(id).remove(); 
+                let db = JSON.parse(localStorage.getItem(DB_KEY)); 
+                db = db.filter(x => x.id != id); 
+                localStorage.setItem(DB_KEY, JSON.stringify(db)); 
+                renderHistory(); 
+            } 
         }
 
         function toggleSelectAll() {
@@ -279,11 +270,10 @@
 
         function directPrint() {
             const selected = document.querySelectorAll('.db-chk:checked');
-            if(selected.length === 0) return alert("Please select a record to print.");
+            if(selected.length === 0) return alert("Please select a record.");
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             const printCont = document.getElementById('printContainer');
             printCont.innerHTML = '';
-            
             selected.forEach((chk) => {
                 const data = db.find(x => x.id == chk.value);
                 const page = document.createElement('div');
@@ -296,7 +286,7 @@
 
         async function generateFinalPDF(isTelegram) {
             const selected = document.querySelectorAll('.db-chk:checked');
-            if(selected.length === 0) return alert("Please select at least one record.");
+            if(selected.length === 0) return alert("Select at least one.");
             document.getElementById('loader').style.display = 'flex';
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF('l', 'mm', 'a4');
@@ -304,11 +294,10 @@
             for(let i=0; i < selected.length; i++) {
                 const data = db.find(x => x.id == selected[i].value);
                 const tempDiv = document.createElement('div');
-                tempDiv.style.width = '297mm';
-                tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px';
+                tempDiv.style.width = '297mm'; tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px';
                 tempDiv.innerHTML = generatePrintHTML(data);
                 document.body.appendChild(tempDiv);
-                const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true });
+                const canvas = await html2canvas(tempDiv, { scale: 2 });
                 const imgData = canvas.toDataURL('image/jpeg', 1.0);
                 if(i > 0) pdf.addPage();
                 pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
@@ -318,81 +307,18 @@
                 const blob = pdf.output('blob');
                 const fd = new FormData();
                 fd.append('chat_id', chatId);
-                fd.append('document', blob, `DAR_Professor_${Date.now()}.pdf`);
+                fd.append('document', blob, `DAR_${Date.now()}.pdf`);
                 await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: fd });
                 alert("SENT TO TELEGRAM");
-            } else { pdf.save(`DAR_Report_${Date.now()}.pdf`); }
+            } else { pdf.save(`DAR_${Date.now()}.pdf`); }
             document.getElementById('loader').style.display = 'none';
         }
 
         function generatePrintHTML(data) {
-            const getCircle = (checked) => `
-                <div style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1px solid black; border-radius:50%; margin:auto;">
-                    ${checked ? '<div style="width:10px; height:10px; background:black; border-radius:50%;"></div>' : ''}
-                </div>`;
-
-            let rowsHtml = data.rows.map((r, i) => `
-                <tr style="height:35px;">
-                    <td style="border:1.5px solid black; font-weight:700;">${i+1}</td>
-                    <td style="border:1.5px solid black;">${r.c}</td>
-                    <td style="border:1.5px solid black; font-weight:700; color:#2563eb; text-transform:uppercase;">${r.s}</td>
-                    <td style="border:1.5px solid black; text-align:left; padding-left:10px;">${r.w}</td>
-                    <td style="border:1.5px solid black;">${getCircle(r.b1)}</td>
-                    <td style="border:1.5px solid black;">${getCircle(r.b2)}</td>
-                    <td style="border:1.5px solid black;">${getCircle(r.b3)}</td>
-                    <td style="border:1.5px solid black;">${getCircle(r.b4)}</td>
-                    <td style="border:1.5px solid black;">${r.r}</td>
-                </tr>`).join('');
-
-            return `
-            <div style="width:297mm; min-height:210mm; padding:12mm; background:white; font-family: 'Inter', sans-serif; color:black; margin:auto;">
-                <div style="text-align:center; margin-bottom:15px;">
-                    <h1 style="margin:0; font-size:42px; font-weight:400; color:black; text-transform:uppercase; letter-spacing:2px;">DHANMONDI SC</h1>
-                    <p style="margin:2px 0 0 0; font-size:11px; font-weight:700; letter-spacing:8px; text-transform:uppercase; color:#64748b;">Daily Activity Report</p>
-                </div>
-                
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
-                    <div style="font-size:13px; line-height:1.6;">
-                        <b>ASSIGNED BY:</b> ${data.assigned}<br>
-                        <b>NAME:</b> SM FAISAL AHMED<br>
-                        <b style="color:#2563eb;">HR ID: ${data.hr}</b><br>
-                        <b>DESIG:</b> SENIOR SUPERVISOR
-                    </div>
-                    <div style="text-align:right; font-size:13px;">
-                        <b>DATE:</b> ${data.date}<br>
-                        <b>TIME:</b> ${data.startTime || '00:00'} - ${data.endTime || '00:00'}<br>
-                        <div style="margin-top:5px;">
-                            <b style="font-size:16px; text-transform:uppercase; font-weight:700;">SHIFT: ${data.shift}</b>
-                        </div>
-                    </div>
-                </div>
-
-                <table style="width:100%; border-collapse:collapse; text-align:center; font-size:11px; border:1.5px solid black;">
-                    <thead>
-                        <tr style="background:#f8fafc; height:42px;">
-                            <th style="border:1.5px solid black; width:35px;">SL</th>
-                            <th style="border:1.5px solid black; width:110px;">Client</th>
-                            <th style="border:1.5px solid black; width:100px;">Site Code</th>
-                            <th style="border:1.5px solid black; width:300px;">Work Details</th>
-                            <th style="border:1.5px solid black; width:80px;">Operation</th>
-                            <th style="border:1.5px solid black; width:100px;">Implementation</th>
-                            <th style="border:1.5px solid black; width:50px;">PM</th>
-                            <th style="border:1.5px solid black; width:60px;">Others</th>
-                            <th style="border:1.5px solid black;">Remarks</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-
-                <div style="display:flex; justify-content:space-between; margin-top:85px; padding: 0 60px;">
-                    <div style="border-top:1.5px solid black; width:200px; text-align:center; font-size:12px; font-weight:700; padding-top:10px;">SUBMITTED BY</div>
-                    <div style="border-top:1.5px solid black; width:200px; text-align:center; font-size:12px; font-weight:700; padding-top:10px;">CHECKED BY</div>
-                    <div style="border-top:1.5px solid black; width:200px; text-align:center; font-size:12px; font-weight:700; padding-top:10px;">RECEIVED BY</div>
-                </div>
-            </div>`;
+            const getCircle = (checked) => `<div style="display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border:1px solid black; border-radius:50%; margin:auto;">${checked ? '<div style="width:10px; height:10px; background:black; border-radius:50%;"></div>' : ''}</div>`;
+            let rowsHtml = data.rows.map((r, i) => `<tr style="height:35px;"><td style="border:1.5px solid black; font-weight:700;">${i+1}</td><td style="border:1.5px solid black;">${r.c}</td><td style="border:1.5px solid black; font-weight:700; color:#2563eb; text-transform:uppercase;">${r.s}</td><td style="border:1.5px solid black; text-align:left; padding-left:10px;">${r.w}</td><td style="border:1.5px solid black;">${getCircle(r.b1)}</td><td style="border:1.5px solid black;">${getCircle(r.b2)}</td><td style="border:1.5px solid black;">${getCircle(r.b3)}</td><td style="border:1.5px solid black;">${getCircle(r.b4)}</td><td style="border:1.5px solid black;">${r.r}</td></tr>`).join('');
+            return `<div style="width:297mm; min-height:210mm; padding:12mm; background:white; color:black; margin:auto;"><div style="text-align:center; margin-bottom:15px;"><h1 style="margin:0; font-size:42px; font-weight:400; text-transform:uppercase;">DHANMONDI SC</h1><p style="margin:2px 0 0 0; font-size:11px; font-weight:700; letter-spacing:8px; text-transform:uppercase; color:#64748b;">Daily Activity Report</p></div><div style="display:flex; justify-content:space-between; margin-bottom:20px;"><div><b>ASSIGNED:</b> ${data.assigned}<br><b>NAME:</b> SM FAISAL AHMED<br><b style="color:#2563eb;">HR ID: ${data.hr}</b><br><b>DESIG:</b> SENIOR SUPERVISOR</div><div style="text-align:right;"><b>DATE:</b> ${data.date}<br><b>TIME:</b> ${data.startTime} - ${data.endTime}<br><b>SHIFT: ${data.shift}</b></div></div><table style="width:100%; border-collapse:collapse; text-align:center; font-size:11px; border:1.5px solid black;"><thead><tr style="background:#f8fafc; height:42px;"><th style="border:1.5px solid black; width:35px;">SL</th><th style="border:1.5px solid black; width:110px;">Client</th><th style="border:1.5px solid black; width:100px;">Site Code</th><th style="border:1.5px solid black; width:300px;">Work Details</th><th style="border:1.5px solid black; width:80px;">Operation</th><th style="border:1.5px solid black; width:100px;">Implementation</th><th style="border:1.5px solid black; width:50px;">PM</th><th style="border:1.5px solid black; width:60px;">Others</th><th style="border:1.5px solid black;">Remarks</th></tr></thead><tbody>${rowsHtml}</tbody></table><div style="display:flex; justify-content:space-between; margin-top:85px; padding: 0 60px;"><div style="border-top:1.5px solid black; width:200px; text-align:center; font-weight:700; padding-top:10px;">SUBMITTED BY</div><div style="border-top:1.5px solid black; width:200px; text-align:center; font-weight:700; padding-top:10px;">CHECKED BY</div><div style="border-top:1.5px solid black; width:200px; text-align:center; font-weight:700; padding-top:10px;">RECEIVED BY</div></div></div>`;
         }
-
-        function deleteItem(id) { if(confirm("Permanently delete this report?")) { let db = JSON.parse(localStorage.getItem(DB_KEY)); db = db.filter(x => x.id != id); localStorage.setItem(DB_KEY, JSON.stringify(db)); renderHistory(); } }
     </script>
 </body>
 </html>
