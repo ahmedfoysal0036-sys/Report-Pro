@@ -3,7 +3,16 @@ const admin = require('firebase-admin');
 const ExcelJS = require('exceljs');
 const http = require('http');
 
-const serviceAccount = require("./serviceAccountKey.json");
+// Environment Variable থেকে ক্রেডেনশিয়াল নেওয়া
+let serviceAccount;
+try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} catch (e) {
+    console.error("Firebase Credentials missing or invalid in Environment Variables!");
+    // যদি রেন্ডারে সেট না থাকে তবে লোকাল ফাইল চেক করবে
+    serviceAccount = require("./serviceAccountKey.json");
+}
+
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
@@ -27,7 +36,6 @@ bot.on('text', async (ctx) => {
     ctx.reply(`📊 Generating Report for: ${query}...`);
 
     try {
-        // --- optimization: query path exact match check ---
         const snapshot = await db.ref('reports').orderByChild('date').startAt(query).endAt(query + "\uf8ff").once('value');
         const allData = snapshot.val();
         
@@ -69,7 +77,6 @@ bot.on('text', async (ctx) => {
             });
         });
 
-        // Styling
         worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
         worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0F172A' } };
         worksheet.eachRow((row) => {
@@ -90,4 +97,4 @@ bot.on('text', async (ctx) => {
     }
 });
 
-bot.launch().then(() => console.log("✅ Bot Online - Phoenix Optimized!"));
+bot.launch().then(() => console.log("✅ Bot Online - Phoenix Cloud Ready!"));
