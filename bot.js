@@ -13,7 +13,7 @@ try {
         throw new Error("Env Var not found");
     }
 } catch (e) {
-    console.error("Firebase Credentials missing or invalid in Environment Variables!");
+    console.error("Firebase Credentials missing or invalid!");
     serviceAccount = require("./serviceAccountKey.json");
 }
 
@@ -25,7 +25,6 @@ if (!admin.apps.length) {
 }
 
 const db = admin.database();
-// ১. এখানে একটি ছোট চেক যোগ করা হয়েছে যাতে কানেকশন সচল থাকে
 db.ref('.info/connected').on('value', (s) => {
     if (s.val() === true) console.log("📡 Connected to Firebase Realtime DB");
 });
@@ -40,21 +39,31 @@ http.createServer((req, res) => {
 
 bot.on('text', async (ctx) => {
     const query = ctx.message.text.trim().replace(/\//g, '-');
-    if (!/^\d{4}-\d{2}(-\d{2})?$/.test(query)) return;
+    
+    // সাপোর্ট করবে: 2026, 2026-03, 2026-03-11
+    if (!/^\d{4}(-\d{2})?(-\d{2})?$/.test(query)) return;
 
     ctx.reply(`📊 Generating Report for: ${query}...`);
 
     try {
-        // ২. টাইমআউট এড়াতে কুয়েরি লিমিট এবং সঠিক ইনডেক্স ব্যবহার নিশ্চিত করা হয়েছে
+        let startAt = query;
+        let endAt = query + "\uf8ff";
+
+        // যদি ইউজার শুধু ৪ ডিজিটের বছর দেয় (যেমন 2026)
+        if (query.length === 4) {
+            startAt = `${query}-01-01`;
+            endAt = `${query}-12-31\uf8ff`;
+        }
+
         const snapshot = await db.ref('reports')
             .orderByChild('date')
-            .startAt(query)
-            .endAt(query + "\uf8ff")
+            .startAt(startAt)
+            .endAt(endAt)
             .once('value');
             
         const allData = snapshot.val();
         
-        if (!allData) return ctx.reply("❌ No data found for this date.");
+        if (!allData) return ctx.reply("❌ No data found for this period.");
 
         const results = Object.values(allData)
             .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -112,7 +121,6 @@ bot.on('text', async (ctx) => {
     }
 });
 
-// ৩. এরর হ্যান্ডলিং যোগ করা হয়েছে যাতে কোনো ছোট ভুলের জন্য পুরো বট ক্র্যাশ না করে
 bot.catch((err) => console.error("Telegraf Error:", err));
 
 bot.launch().then(() => console.log("✅ Bot Online - Phoenix Cloud Ready!"));
