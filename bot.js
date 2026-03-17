@@ -1,7 +1,7 @@
 const { Telegraf } = require('telegraf');
 const admin = require('firebase-admin');
 const ExcelJS = require('exceljs');
-const http = require('http'); // 1. HTTP module add kora holo
+const http = require('http');
 
 const serviceAccount = require("./serviceAccountKey.json");
 if (!admin.apps.length) {
@@ -14,7 +14,6 @@ if (!admin.apps.length) {
 const db = admin.database();
 const bot = new Telegraf('8589894169:AAFNWCOr2EDzqGkEvH-6CL9Iw6QJGdGjKTc');
 
-// 2. Render-er jonno ekti simple server jeta bot-ke "Live" thakte help korbe
 const port = process.env.PORT || 3000;
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -28,12 +27,13 @@ bot.on('text', async (ctx) => {
     ctx.reply(`📊 Generating Report for: ${query}...`);
 
     try {
-        const snapshot = await db.ref('reports').once('value');
+        // --- optimization: query path exact match check ---
+        const snapshot = await db.ref('reports').orderByChild('date').startAt(query).endAt(query + "\uf8ff").once('value');
         const allData = snapshot.val();
-        if (!allData) return ctx.reply("No data found.");
+        
+        if (!allData) return ctx.reply("❌ No data found for this date.");
 
         const results = Object.values(allData)
-            .filter(r => r && r.date && r.date.startsWith(query))
             .sort((a, b) => new Date(a.date) - new Date(b.date));
 
         const workbook = new ExcelJS.Workbook();
@@ -52,30 +52,26 @@ bot.on('text', async (ctx) => {
 
         let slCount = 1;
         results.forEach(report => {
-            const rows = report.rows || [];
+            const rows = Array.isArray(report.rows) ? report.rows : (report.rows ? Object.values(report.rows) : []);
             const validRows = rows.filter(row => row && (row.s || row.w));
 
             validRows.forEach(row => {
-                let category = row.cat || "-";
-                let assignedBy = row.ab || "N/A";
-                let teamPerson = row.t || "N/A";
-
                 worksheet.addRow({
                     sl: slCount++,
                     date: report.date || 'N/A',
                     client: row.c || '',
                     site: row.s || '',
                     work: row.w || '',
-                    cat: category,
-                    assign: assignedBy,
-                    team: teamPerson
+                    cat: row.cat || "-",
+                    assign: row.ab || "N/A",
+                    team: row.t || "N/A"
                 });
             });
         });
 
+        // Styling
         worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
         worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '0F172A' } };
-        
         worksheet.eachRow((row) => {
             row.eachCell((cell) => {
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
@@ -89,9 +85,9 @@ bot.on('text', async (ctx) => {
         });
 
     } catch (e) {
-        console.error(e);
-        ctx.reply("Error: " + e.message);
+        console.error("Error Log:", e);
+        ctx.reply("❌ Error: " + e.message);
     }
 });
 
-bot.launch().then(() => console.log("✅ Bot Online - Phoenix System, Professor!"));
+bot.launch().then(() => console.log("✅ Bot Online - Phoenix Optimized!"));
