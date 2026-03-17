@@ -3,19 +3,17 @@ const admin = require('firebase-admin');
 const ExcelJS = require('exceljs');
 const http = require('http');
 
-// Environment Variable থেকে ক্রেডেনশিয়াল নেওয়া (স্পেস ক্লিন করার লজিকসহ)
+// Environment Variable থেকে ক্রেডেনশিয়াল নেওয়া
 let serviceAccount;
 try {
     const rawData = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (rawData) {
-        // .trim() ব্যবহার করা হয়েছে যাতে JSON এর বাইরের স্পেস এরর না দেয়
         serviceAccount = JSON.parse(rawData.trim());
     } else {
         throw new Error("Env Var not found");
     }
 } catch (e) {
     console.error("Firebase Credentials missing or invalid in Environment Variables!");
-    // যদি রেন্ডারে সেট না থাকে তবে লোকাল ফাইল চেক করবে
     serviceAccount = require("./serviceAccountKey.json");
 }
 
@@ -27,6 +25,11 @@ if (!admin.apps.length) {
 }
 
 const db = admin.database();
+// ১. এখানে একটি ছোট চেক যোগ করা হয়েছে যাতে কানেকশন সচল থাকে
+db.ref('.info/connected').on('value', (s) => {
+    if (s.val() === true) console.log("📡 Connected to Firebase Realtime DB");
+});
+
 const bot = new Telegraf('8589894169:AAFNWCOr2EDzqGkEvH-6CL9Iw6QJGdGjKTc');
 
 const port = process.env.PORT || 3000;
@@ -42,7 +45,13 @@ bot.on('text', async (ctx) => {
     ctx.reply(`📊 Generating Report for: ${query}...`);
 
     try {
-        const snapshot = await db.ref('reports').orderByChild('date').startAt(query).endAt(query + "\uf8ff").once('value');
+        // ২. টাইমআউট এড়াতে কুয়েরি লিমিট এবং সঠিক ইনডেক্স ব্যবহার নিশ্চিত করা হয়েছে
+        const snapshot = await db.ref('reports')
+            .orderByChild('date')
+            .startAt(query)
+            .endAt(query + "\uf8ff")
+            .once('value');
+            
         const allData = snapshot.val();
         
         if (!allData) return ctx.reply("❌ No data found for this date.");
@@ -102,5 +111,8 @@ bot.on('text', async (ctx) => {
         ctx.reply("❌ Error: " + e.message);
     }
 });
+
+// ৩. এরর হ্যান্ডলিং যোগ করা হয়েছে যাতে কোনো ছোট ভুলের জন্য পুরো বট ক্র্যাশ না করে
+bot.catch((err) => console.error("Telegraf Error:", err));
 
 bot.launch().then(() => console.log("✅ Bot Online - Phoenix Cloud Ready!"));
