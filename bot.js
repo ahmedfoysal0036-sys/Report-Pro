@@ -3,10 +3,16 @@ const admin = require('firebase-admin');
 const ExcelJS = require('exceljs');
 const http = require('http');
 
-// Environment Variable থেকে ক্রেডেনশিয়াল নেওয়া
+// Environment Variable থেকে ক্রেডেনশিয়াল নেওয়া (স্পেস ক্লিন করার লজিকসহ)
 let serviceAccount;
 try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    const rawData = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (rawData) {
+        // .trim() ব্যবহার করা হয়েছে যাতে JSON এর বাইরের স্পেস এরর না দেয়
+        serviceAccount = JSON.parse(rawData.trim());
+    } else {
+        throw new Error("Env Var not found");
+    }
 } catch (e) {
     console.error("Firebase Credentials missing or invalid in Environment Variables!");
     // যদি রেন্ডারে সেট না থাকে তবে লোকাল ফাইল চেক করবে
