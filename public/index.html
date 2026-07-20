@@ -1,497 +1,341 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ahmed Activity Report | Dhanmondi SC Edition</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .report-paper { width: 297mm; min-height: 210mm; padding: 10mm; background: white; margin: auto; color: black; position: relative; }
-        table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
-        th, td { border: 1px solid black; padding: 4px 2px; text-align: center; font-size: 10px; vertical-align: middle; }
-        .header-input { border: none; outline: none; font-weight: bold; font-size: 11px; background: transparent; border-bottom: 1px solid #ddd; }
-        .table-input { border: none; outline: none; width: 100%; text-align: center; font-size: 10px; background: transparent; resize: none; overflow: hidden; word-break: break-word; white-space: pre-wrap; }
-        .work-input { text-align: left !important; padding: 2px 4px; min-height: 24px; line-height: 1.2; }
-        .sc-title { font-size: 38px; font-weight: 400; margin: 0; color: black; letter-spacing: 3px; text-transform: uppercase; }
-        select.table-input { appearance: none; cursor: pointer; text-align-last: center; }
-        @media print { .no-print { display: none !important; } body { background: white !important; } #printContainer { display: block !important; width: 100% !important; } .print-page-break { page-break-after: always; display: block !important; } @page { size: landscape; margin: 0; } }
-        #printContainer { display: none; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ahmed Activity Report | Dhanmondi SC Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .report-paper { width: 297mm; min-height: 210mm; padding: 10mm; background: white; margin: auto; color: black; position: relative; }
+        table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
+        th, td { border: 1px solid black; padding: 2px; text-align: center; font-size: 10px; height: 28px; vertical-align: middle; }
+        .header-input { border: none; outline: none; font-weight: bold; font-size: 11px; background: transparent; border-bottom: 1px solid #ddd; }
+        .table-input { border: none; outline: none; width: 100%; text-align: center; font-size: 10px; background: transparent; height: 100%; }
+        .sc-title { font-size: 38px; font-weight: 400; margin: 0; color: black; letter-spacing: 3px; text-transform: uppercase; }
+        select.table-input { appearance: none; cursor: pointer; text-align-last: center; }
+        @media print { .no-print { display: none !important; } body { background: white !important; } #printContainer { display: block !important; width: 100% !important; } .print-page-break { page-break-after: always; display: block !important; } @page { size: landscape; margin: 0; } }
+        #printContainer { display: none; }
+    </style>
 </head>
 <body class="bg-slate-200">
 
-    <div id="loader" class="fixed inset-0 bg-black/90 z-[9999] hidden flex-col items-center justify-center text-white">
-        <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-amber-500 mb-4"></div>
-        <p class="font-bold tracking-tighter uppercase text-xs">Syncing with Cloud...</p>
-    </div>
+    <div id="loader" class="fixed inset-0 bg-black/90 z-[9999] hidden flex-col items-center justify-center text-white">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-amber-500 mb-4"></div>
+        <p class="font-bold tracking-tighter uppercase text-xs">Syncing with Cloud...</p>
+    </div>
 
-    <!-- Hidden Datalist for Auto-Suggestions based on history -->
-    <datalist id="clientList"></datalist>
-    <datalist id="siteList"></datalist>
-    <datalist id="assignByList"></datalist>
-    <datalist id="teamList"></datalist>
+    <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 no-print flex justify-between items-center shadow-lg">
+        <div class="flex items-center gap-2 pl-4">
+            <i class="fas fa-file-invoice text-amber-500"></i>
+            <h1 class="font-black text-xs tracking-widest uppercase">DHANMONDI SC REPORT</h1>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="switchTab('entry')" class="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg text-[10px] font-black transition-all">ENTRY</button>
+            <button onclick="switchTab('history')" class="bg-slate-700 hover:bg-slate-600 px-5 py-2 rounded-lg text-[10px] font-black transition-all">HISTORY</button>
+        </div>
+    </nav>
 
-    <nav class="bg-slate-900 text-white p-3 sticky top-0 z-50 no-print flex justify-between items-center shadow-lg">
-        <div class="flex items-center gap-2 pl-4">
-            <i class="fas fa-file-invoice text-amber-500"></i>
-            <h1 class="font-black text-xs tracking-widest uppercase">DHANMONDI SC REPORT <span class="text-amber-400 text-[9px] ml-2">PROFESSOR EDITION</span></h1>
-        </div>
-        <div class="flex gap-3">
-            <button onclick="switchTab('entry')" id="navEntryBtn" class="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg text-[10px] font-black transition-all shadow-md">ENTRY</button>
-            <button onclick="switchTab('history')" id="navHistoryBtn" class="bg-slate-700 hover:bg-slate-600 px-5 py-2 rounded-lg text-[10px] font-black transition-all shadow-md">HISTORY</button>
-        </div>
-    </nav>
+    <div id="entrySection" class="p-6">
+        <div id="mainReportArea">
+            <div class="report-paper shadow-2xl">
+                <input type="hidden" id="editingId" value="">
+                <div class="text-center mb-4">
+                    <h1 class="sc-title">DHANMONDI SC</h1>
+                    <p class="text-[10px] font-bold tracking-[0.5em] uppercase text-slate-500">Daily Activity Report</p>
+                </div>
 
-    <div id="entrySection" class="p-6">
-        <div id="mainReportArea">
-            <div class="report-paper shadow-2xl">
-                <input type="hidden" id="editingId" value="">
-                <div class="text-center mb-4">
-                    <h1 class="sc-title">DHANMONDI SC</h1>
-                    <p class="text-[10px] font-bold tracking-[0.5em] uppercase text-slate-500">Daily Activity Report</p>
-                </div>
+                <div class="flex justify-between items-end mb-4 px-2">
+                    <div class="space-y-1">
+                        <p class="text-[11px] font-bold">SC Head: <input type="text" id="assignedBy" class="header-input w-48" value="MD Azmir Hossain"></p>
+                        <p class="text-[11px] font-bold">Name: <input type="text" id="userName" class="header-input w-48" value="S.M.Faisal Ahmed"></p>
+                        <p class="text-[11px] font-bold">HR ID: <input type="text" id="hrId" class="header-input w-24 text-blue-600" value="0036"></p>
+                        <p class="text-[11px] font-bold">Designation: <input type="text" id="userDesig" class="header-input w-48" value="Sr Supervisor"></p>
+                    </div>
+                    <div class="text-right space-y-2">
+                        <p class="text-[11px] font-bold">Date: <input type="date" id="reportDate" class="header-input w-32"></p>
+                        <div class="flex gap-2 justify-end">
+                            <p class="text-[11px] font-bold">From: <input type="time" id="startTime" class="header-input w-20"></p>
+                            <p class="text-[11px] font-bold">To: <input type="time" id="endTime" class="header-input w-20"></p>
+                        </div>
+                        <div class="flex justify-end gap-3 text-[10px] font-bold no-print">
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftDay" checked class="accent-black"> DAY</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftNight" class="accent-black"> NIGHT</label>
+                        </div>
+                    </div>
+                </div>
 
-                <div class="flex justify-between items-end mb-4 px-2">
-                    <div class="space-y-1">
-                        <p class="text-[11px] font-bold">SC Head: <input type="text" id="assignedBy" class="header-input w-48" value="MD Azmir Hossain" oninput="autoSaveDraft()"></p>
-                        <p class="text-[11px] font-bold">Name: <input type="text" id="userName" class="header-input w-48" value="S.M.Faisal Ahmed" oninput="autoSaveDraft()"></p>
-                        <p class="text-[11px] font-bold">HR ID: <input type="text" id="hrId" class="header-input w-24 text-blue-600" value="0036" oninput="autoSaveDraft()"></p>
-                        <p class="text-[11px] font-bold">Designation: <input type="text" id="userDesig" class="header-input w-48" value="Sr Supervisor" oninput="autoSaveDraft()"></p>
-                    </div>
-                    <div class="text-right space-y-2">
-                        <p class="text-[11px] font-bold">Date: <input type="date" id="reportDate" class="header-input w-32" onchange="autoSaveDraft()"></p>
-                        <div class="flex gap-2 justify-end">
-                            <p class="text-[11px] font-bold">From: <input type="time" id="startTime" class="header-input w-20" onchange="autoSaveDraft()"></p>
-                            <p class="text-[11px] font-bold">To: <input type="time" id="endTime" class="header-input w-20" onchange="autoSaveDraft()"></p>
-                        </div>
-                        <div class="flex justify-end gap-3 text-[10px] font-bold no-print">
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftDay" checked class="accent-black" onchange="autoSaveDraft()"> DAY</label>
-                            <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftNight" class="accent-black" onchange="autoSaveDraft()"> NIGHT</label>
-                        </div>
-                    </div>
-                </div>
+                <table>
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th style="width: 30px;">SL</th>
+                            <th style="width: 120px;">Client</th>
+                            <th style="width: 100px;">Site Code</th>
+                            <th style="width: 250px;">Work Details</th>
+                            <th style="width: 90px;">Category</th>
+                            <th style="width: 100px;">Assign By</th>
+                            <th style="width: 100px;">Team/Person</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
 
-                <table>
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th style="width: 30px;">SL</th>
-                            <th style="width: 120px;">Client</th>
-                            <th style="width: 100px;">Site Code</th>
-                            <th style="width: 230px;">Work Details</th>
-                            <th style="width: 90px;">Category</th>
-                            <th style="width: 90px;">Assign By</th>
-                            <th style="width: 90px;">Team/Person</th>
-                            <th style="width: 40px;" class="no-print">Act</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody"></tbody>
-                </table>
-                
-                <div class="mt-2 no-print flex gap-2">
-                    <button onclick="addRow()" class="bg-emerald-600 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase shadow hover:bg-emerald-500"><i class="fas fa-plus mr-1"></i> Add Row</button>
-                    <button onclick="clearTableInputs()" class="bg-rose-600 text-white px-3 py-1.5 rounded text-[10px] font-black uppercase shadow hover:bg-rose-500"><i class="fas fa-trash-alt mr-1"></i> Clear Fields</button>
-                </div>
+                <div class="flex justify-between mt-16 px-10">
+                    <div class="border-t border-black w-40 text-center text-[10px] font-bold pt-1">SUBMITTED BY</div>
+                    <div class="border-t border-black w-40 text-center text-[10px] font-bold pt-1">CHECKED BY</div>
+                    <div class="border-t border-black w-40 text-center text-[10px] font-bold pt-1">RECEIVED BY</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="fixed bottom-10 right-10 flex flex-col gap-3 no-print">
+            <button onclick="init()" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700"><i class="fas fa-plus"></i></button>
+            <button onclick="saveData()" class="bg-amber-500 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all"><i class="fas fa-save text-2xl"></i></button>
+        </div>
+    </div>
 
-                <div class="flex justify-between mt-12 px-10">
-                    <div class="border-t border-black w-40 text-center text-[10px] font-bold pt-1">SUBMITTED BY</div>
-                    <div class="border-t border-black w-40 text-center text-[10px] font-bold pt-1">CHECKED BY</div>
-                    <div class="border-t border-black w-40 text-center text-[10px] font-bold pt-1">RECEIVED BY</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="fixed bottom-10 right-10 flex flex-col gap-3 no-print">
-            <button onclick="init()" title="Reset Form" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700 transition-all"><i class="fas fa-redo"></i></button>
-            <button onclick="saveData()" title="Save & Sync to Cloud" class="bg-amber-500 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all"><i class="fas fa-save text-2xl"></i></button>
-        </div>
-    </div>
+    <div id="historySection" class="hidden p-6 max-w-4xl mx-auto no-print">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-slate-800 font-black text-xl uppercase">Cloud Sync History</h2>
+            <button onclick="toggleSelectAll()" id="selBtn" class="bg-slate-200 text-slate-700 px-3 py-1 rounded text-[10px] font-bold uppercase">Select All</button>
+        </div>
+        <div id="historyList" class="space-y-3 mb-24"></div>
+        <div class="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md p-6 flex justify-center gap-3 border-t">
+            <button onclick="generateFinalPDF(true)" class="bg-blue-700 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase">Telegram</button>
+            <button onclick="generateFinalPDF(false)" class="bg-slate-800 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase">Download PDF</button>
+            <button onclick="exportToExcel()" class="bg-green-600 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase">Excel</button>
+            <button onclick="directPrint()" class="bg-amber-500 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase">Print</button>
+        </div>
+    </div>
 
-    <div id="historySection" class="hidden p-6 max-w-4xl mx-auto no-print">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-3 bg-white p-4 rounded-xl shadow-sm">
-            <h2 class="text-slate-800 font-black text-lg uppercase">Cloud Sync History</h2>
-            <div class="flex gap-2 w-full md:w-auto">
-                <input type="text" id="historySearch" placeholder="Search site or client..." oninput="renderHistory()" class="border px-3 py-1 rounded text-xs outline-none flex-1 md:w-48">
-                <button onclick="toggleSelectAll()" id="selBtn" class="bg-slate-200 text-slate-700 px-3 py-1 rounded text-[10px] font-bold uppercase hover:bg-slate-300">Select All</button>
-            </div>
-        </div>
-        <div id="historyList" class="space-y-3 mb-28"></div>
-        <div class="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md p-4 flex flex-wrap justify-center gap-3 border-t shadow-lg z-40">
-            <button onclick="generateFinalPDF(true)" class="bg-blue-700 hover:bg-blue-600 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow"><i class="fab fa-telegram-plane mr-1"></i> Telegram</button>
-            <button onclick="generateFinalPDF(false)" class="bg-slate-800 hover:bg-slate-700 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow"><i class="fas fa-file-pdf mr-1"></i> PDF</button>
-            <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-500 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow"><i class="fas fa-file-excel mr-1"></i> Excel</button>
-            <button onclick="directPrint()" class="bg-amber-500 hover:bg-amber-400 text-white px-5 py-3 rounded-full font-black text-[10px] uppercase shadow"><i class="fas fa-print mr-1"></i> Print</button>
-        </div>
-    </div>
+    <div id="printContainer"></div>
 
-    <div id="printContainer"></div>
+    <script>
+        const firebaseConfig = { databaseURL: "https://infinite-v1-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const dbRef = firebase.database().ref('reports');
+        const botToken = "8589894169:AAFNWCOr2EDzqGkEvH-6CL9Iw6QJGdGjKTc";
+        const chatId = "682844989";
+        const DB_KEY = 'prof_stable_v26_final';
 
-    <script>
-        const firebaseConfig = { databaseURL: "https://infinite-v1-default-rtdb.firebaseio.com/" };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const dbRef = firebase.database().ref('reports');
-        const botToken = "8589894169:AAFNWCOr2EDzqGkEvH-6CL9Iw6QJGdGjKTc";
-        const chatId = "682844989";
-        const DB_KEY = 'prof_stable_v26_final';
-        const DRAFT_KEY = 'prof_draft_v26';
+        function init() {
+            document.getElementById('editingId').value = "";
+            const tb = document.getElementById('tableBody');
+            tb.innerHTML = '';
+            for(let i=1; i<=12; i++) {
+                tb.innerHTML += `<tr>
+                    <td class="font-bold bg-gray-50">${i}</td>
+                    <td><input type="text" class="table-input client"></td>
+                    <td><input type="text" class="table-input font-bold text-blue-600 site uppercase"></td>
+                    <td><input type="text" class="table-input text-left px-2 work"></td>
+                    <td>
+                        <select class="table-input category">
+                            <option value="">-</option>
+                            <option value="Operation">Operation</option>
+                            <option value="Implementation">Implementation</option>
+                            <option value="PM">PM</option>
+                            <option value="Others">Others</option>
+                        </select>
+                    </td>
+                    <td><input type="text" class="table-input assignBy"></td>
+                    <td><input type="text" class="table-input team"></td>
+                </tr>`;
+            }
+            document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('startTime').value = "09:00";
+            document.getElementById('endTime').value = "18:00";
+        }
+        init();
 
-        function updateSuggestions() {
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const clients = new Set();
-            const sites = new Set();
-            const assignees = new Set();
-            const teams = new Set();
+        dbRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                const reportsArray = Object.keys(data).map(key => data[key]);
+                localStorage.setItem(DB_KEY, JSON.stringify(reportsArray));
+                if(!document.getElementById('historySection').classList.contains('hidden')) renderHistory();
+            }
+        });
 
-            db.forEach(h => {
-                if(h.rows) {
-                    h.rows.forEach(r => {
-                        if(r.c) clients.add(r.c);
-                        if(r.s) sites.add(r.s);
-                        if(r.ab) assignees.add(r.ab);
-                        if(r.t) teams.add(r.t);
-                    });
-                }
-            });
+        function switchTab(t) {
+            document.getElementById('entrySection').classList.toggle('hidden', t !== 'entry');
+            document.getElementById('historySection').classList.toggle('hidden', t !== 'history');
+            if(t === 'history') renderHistory();
+        }
 
-            document.getElementById('clientList').innerHTML = Array.from(clients).map(x => `<option value="${x}">`).join('');
-            document.getElementById('siteList').innerHTML = Array.from(sites).map(x => `<option value="${x}">`).join('');
-            document.getElementById('assignByList').innerHTML = Array.from(assignees).map(x => `<option value="${x}">`).join('');
-            document.getElementById('teamList').innerHTML = Array.from(teams).map(x => `<option value="${x}">`).join('');
-        }
+        async function saveData() {
+            document.getElementById('loader').style.display = 'flex';
+            const editingId = document.getElementById('editingId').value;
+            const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
+                c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
+                w: tr.querySelector('.work').value, cat: tr.querySelector('.category').value,
+                ab: tr.querySelector('.assignBy').value, t: tr.querySelector('.team').value
+            }));
 
-        function init(customRows = null) {
-            document.getElementById('editingId').value = "";
-            const tb = document.getElementById('tableBody');
-            tb.innerHTML = '';
-            
-            const rowCount = customRows ? customRows.length : 12;
-            for(let i=0; i<rowCount; i++) {
-                const rData = customRows ? customRows[i] : {c:'', s:'', w:'', cat:'', ab:'', t:''};
-                appendRowElement(i + 1, rData);
-            }
-            
-            updateSuggestions();
+            const dataId = editingId ? editingId : Date.now().toString();
+            const data = { 
+                id: dataId, date: document.getElementById('reportDate').value, 
+                startTime: document.getElementById('startTime').value, endTime: document.getElementById('endTime').value,
+                hr: document.getElementById('hrId').value, assigned: document.getElementById('assignedBy').value,
+                shift: document.getElementById('shiftDay').checked ? 'DAY' : 'NIGHT', rows 
+            };
 
-            if(!customRows) {
-                const savedDraft = localStorage.getItem(DRAFT_KEY);
-                if(savedDraft) {
-                    try {
-                        const d = JSON.parse(savedDraft);
-                        document.getElementById('reportDate').value = d.date || new Date().toISOString().split('T')[0];
-                        document.getElementById('startTime').value = d.startTime || "09:00";
-                        document.getElementById('endTime').value = d.endTime || "18:00";
-                        document.getElementById('assignedBy').value = d.assigned || "MD Azmir Hossain";
-                        document.getElementById('userName').value = d.userName || "S.M.Faisal Ahmed";
-                        document.getElementById('hrId').value = d.hr || "0036";
-                        document.getElementById('userDesig').value = d.userDesig || "Sr Supervisor";
-                        if(d.shift === 'NIGHT') document.getElementById('shiftNight').checked = true;
-                        else document.getElementById('shiftDay').checked = true;
-                        return;
-                    } catch(e) {}
-                }
-                document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
-                document.getElementById('startTime').value = "09:00";
-                document.getElementById('endTime').value = "18:00";
-            }
-        }
+            try {
+                await dbRef.child(dataId).set(data);
+                alert("Cloud Sync Successful!");
+                init();
+                switchTab('history');
+            } catch (e) { alert("Error: " + e.message); }
+            document.getElementById('loader').style.display = 'none';
+        }
 
-        function appendRowElement(sl, data = {c:'', s:'', w:'', cat:'', ab:'', t:''}) {
-            const tb = document.getElementById('tableBody');
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="font-bold bg-gray-50 sl-cell">${sl}</td>
-                <td><input type="text" class="table-input client" list="clientList" value="${data.c || ''}" oninput="autoSaveDraft()"></td>
-                <td><input type="text" class="table-input font-bold text-blue-600 site uppercase" list="siteList" value="${data.s || ''}" oninput="autoSaveDraft()"></td>
-                <td><textarea class="table-input work-input" rows="1" oninput="autoResize(this); autoSaveDraft()">${data.w || ''}</textarea></td>
-                <td>
-                    <select class="table-input category" onchange="autoSaveDraft()">
-                        <option value="">-</option>
-                        <option value="Operation" ${data.cat === 'Operation' ? 'selected' : ''}>Operation</option>
-                        <option value="Implementation" ${data.cat === 'Implementation' ? 'selected' : ''}>Implementation</option>
-                        <option value="PM" ${data.cat === 'PM' ? 'selected' : ''}>PM</option>
-                        <option value="Others" ${data.cat === 'Others' ? 'selected' : ''}>Others</option>
-                    </select>
-                </td>
-                <td><input type="text" class="table-input assignBy" list="assignByList" value="${data.ab || ''}" oninput="autoSaveDraft()"></td>
-                <td><input type="text" class="table-input team" list="teamList" value="${data.t || ''}" oninput="autoSaveDraft()"></td>
-                <td class="no-print"><button onclick="deleteRow(this)" class="text-red-500 hover:text-red-700 px-1"><i class="fas fa-times"></i></button></td>
-            `;
-            tb.appendChild(tr);
-            // Auto resize textareas on load if containing data
-            const textarea = tr.querySelector('.work-input');
-            if(data.w) autoResize(textarea);
-        }
+        function renderHistory() {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const list = document.getElementById('historyList');
+            if(db.length === 0) { list.innerHTML = `<p class="text-center text-slate-500 py-10">No records.</p>`; return; }
+            list.innerHTML = db.slice().reverse().map(h => `
+                <div class="bg-white p-3 rounded-lg shadow-sm flex items-center justify-between border-l-4 border-blue-500">
+                    <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="editReport('${h.id}')">
+                        <input type="checkbox" class="db-chk h-5 w-5" value="${h.id}" onclick="event.stopPropagation()">
+                        <div>
+                            <p class="font-bold text-xs">${h.date} | ${h.shift}</p>
+                            <p class="text-[10px] text-slate-500 uppercase">SC HEAD: ${h.assigned}</p>
+                        </div>
+                    </div>
+                    <button class="text-red-400 p-2" onclick="deleteItem('${h.id}')"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
 
-        function autoResize(textarea) {
-            textarea.style.height = 'auto';
-            textarea.style.height = (textarea.scrollHeight - 4) + 'px';
-        }
+        function editReport(id) {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const data = db.find(x => x.id == id);
+            if (!data) return;
+            switchTab('entry');
+            document.getElementById('editingId').value = data.id;
+            document.getElementById('reportDate').value = data.date;
+            document.getElementById('startTime').value = data.startTime;
+            document.getElementById('endTime').value = data.endTime;
+            document.getElementById('assignedBy').value = data.assigned;
+            document.getElementById('hrId').value = data.hr;
+            data.shift === 'DAY' ? document.getElementById('shiftDay').checked = true : document.getElementById('shiftNight').checked = true;
+            
+            const tableRows = document.querySelectorAll('#tableBody tr');
+            data.rows.forEach((row, i) => {
+                if(tableRows[i]) {
+                    tableRows[i].querySelector('.client').value = row.c;
+                    tableRows[i].querySelector('.site').value = row.s;
+                    tableRows[i].querySelector('.work').value = row.w;
+                    tableRows[i].querySelector('.category').value = row.cat;
+                    tableRows[i].querySelector('.assignBy').value = row.ab;
+                    tableRows[i].querySelector('.team').value = row.t;
+                }
+            });
+        }
 
-        function addRow() {
-            const count = document.querySelectorAll('#tableBody tr').length + 1;
-            appendRowElement(count);
-            autoSaveDraft();
-        }
+        function deleteItem(id) { 
+            if(confirm("Delete Permanently?")) { dbRef.child(id).remove(); renderHistory(); } 
+        }
 
-        function deleteRow(btn) {
-            const row = btn.closest('tr');
-            row.remove();
-            reorderRows();
-            autoSaveDraft();
-        }
+        function toggleSelectAll() {
+            const chks = document.querySelectorAll('.db-chk');
+            const allSel = Array.from(chks).every(c => c.checked);
+            chks.forEach(c => c.checked = !allSel);
+            document.getElementById('selBtn').innerText = allSel ? "Select All" : "Unselect All";
+        }
 
-        function reorderRows() {
-            const rows = document.querySelectorAll('#tableBody tr');
-            rows.forEach((tr, idx) => {
-                tr.querySelector('.sl-cell').innerText = idx + 1;
-            });
-        }
+        function exportToExcel() {
+            const selected = document.querySelectorAll('.db-chk:checked');
+            if (selected.length === 0) return alert("Select records.");
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const finalData = [["Date", "Shift", "Assigned By", "SL", "Client", "Site Code", "Work Details", "Category", "Assign By", "Team"]];
+            selected.forEach(chk => {
+                const h = db.find(x => x.id == chk.value);
+                if(h) h.rows.forEach((r, i) => {
+                    if(r.c || r.s) finalData.push([h.date, h.shift, h.assigned, i+1, r.c, r.s, r.w, r.cat, r.ab, r.t]);
+                });
+            });
+            const ws = XLSX.utils.aoa_to_sheet(finalData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Reports");
+            XLSX.writeFile(wb, `Dhanmondi_SC_${Date.now()}.xlsx`);
+        }
 
-        function clearTableInputs() {
-            if(confirm("Clear all entry fields?")) {
-                localStorage.removeItem(DRAFT_KEY);
-                init();
-            }
-        }
+        function directPrint() {
+            const selected = document.querySelectorAll('.db-chk:checked');
+            if(selected.length === 0) return alert("Select a record.");
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const printCont = document.getElementById('printContainer');
+            printCont.innerHTML = '';
+            selected.forEach(chk => {
+                const data = db.find(x => x.id == chk.value);
+                const page = document.createElement('div');
+                page.className = 'print-page-break';
+                page.innerHTML = generatePrintHTML(data);
+                printCont.appendChild(page);
+            });
+            setTimeout(() => { window.print(); }, 500);
+        }
 
-        function autoSaveDraft() {
-            const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
-                c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
-                w: tr.querySelector('.work').value, cat: tr.querySelector('.category').value,
-                ab: tr.querySelector('.assignBy').value, t: tr.querySelector('.team').value
-            }));
-            const draft = {
-                date: document.getElementById('reportDate').value,
-                startTime: document.getElementById('startTime').value,
-                endTime: document.getElementById('endTime').value,
-                assigned: document.getElementById('assignedBy').value,
-                userName: document.getElementById('userName').value,
-                hr: document.getElementById('hrId').value,
-                userDesig: document.getElementById('userDesig').value,
-                shift: document.getElementById('shiftDay').checked ? 'DAY' : 'NIGHT',
-                rows
-            };
-            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-        }
+        async function generateFinalPDF(isTelegram) {
+            const selected = document.querySelectorAll('.db-chk:checked');
+            if(selected.length === 0) return alert("Select a record.");
+            document.getElementById('loader').style.display = 'flex';
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('l', 'mm', 'a4');
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            for(let i=0; i < selected.length; i++) {
+                const data = db.find(x => x.id == selected[i].value);
+                const tempDiv = document.createElement('div');
+                tempDiv.style.width = '297mm'; tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px';
+                tempDiv.innerHTML = generatePrintHTML(data);
+                document.body.appendChild(tempDiv);
+                const canvas = await html2canvas(tempDiv, { scale: 2 });
+                if(i > 0) pdf.addPage();
+                pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, 297, 210);
+                document.body.removeChild(tempDiv);
+            }
+            if(isTelegram) {
+                const blob = pdf.output('blob');
+                const fd = new FormData();
+                fd.append('chat_id', chatId);
+                fd.append('document', blob, `Report_${Date.now()}.pdf`);
+                await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: fd });
+                alert("Telegram Sent!");
+            } else { pdf.save(`Report_${Date.now()}.pdf`); }
+            document.getElementById('loader').style.display = 'none';
+        }
 
-        init();
-
-        dbRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if(data) {
-                const reportsArray = Object.keys(data).map(key => data[key]);
-                localStorage.setItem(DB_KEY, JSON.stringify(reportsArray));
-                updateSuggestions();
-                if(!document.getElementById('historySection').classList.contains('hidden')) renderHistory();
-            }
-        });
-
-        function switchTab(t) {
-            document.getElementById('entrySection').classList.toggle('hidden', t !== 'entry');
-            document.getElementById('historySection').classList.toggle('hidden', t !== 'history');
-            document.getElementById('navEntryBtn').className = t === 'entry' ? "bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg text-[10px] font-black transition-all shadow-md" : "bg-slate-700 hover:bg-slate-600 px-5 py-2 rounded-lg text-[10px] font-black transition-all shadow-md";
-            document.getElementById('navHistoryBtn').className = t === 'history' ? "bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg text-[10px] font-black transition-all shadow-md" : "bg-slate-700 hover:bg-slate-600 px-5 py-2 rounded-lg text-[10px] font-black transition-all shadow-md";
-            if(t === 'history') renderHistory();
-        }
-
-        async function saveData() {
-            document.getElementById('loader').style.display = 'flex';
-            const editingId = document.getElementById('editingId').value;
-            const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
-                c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
-                w: tr.querySelector('.work').value, cat: tr.querySelector('.category').value,
-                ab: tr.querySelector('.assignBy').value, t: tr.querySelector('.team').value
-            }));
-
-            const dataId = editingId ? editingId : Date.now().toString();
-            const data = { 
-                id: dataId, date: document.getElementById('reportDate').value, 
-                startTime: document.getElementById('startTime').value, endTime: document.getElementById('endTime').value,
-                hr: document.getElementById('hrId').value, assigned: document.getElementById('assignedBy').value,
-                userName: document.getElementById('userName').value, userDesig: document.getElementById('userDesig').value,
-                shift: document.getElementById('shiftDay').checked ? 'DAY' : 'NIGHT', rows 
-            };
-
-            try {
-                await dbRef.child(dataId).set(data);
-                localStorage.removeItem(DRAFT_KEY);
-                alert("Cloud Sync Successful!");
-                init();
-                switchTab('history');
-            } catch (e) { alert("Error: " + e.message); }
-            document.getElementById('loader').style.display = 'none';
-        }
-
-        function renderHistory() {
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const list = document.getElementById('historyList');
-            const query = (document.getElementById('historySearch')?.value || '').toLowerCase();
-            
-            const filtered = db.filter(h => {
-                if(!query) return true;
-                const matchDate = h.date.includes(query);
-                const matchAssigned = (h.assigned || '').toLowerCase().includes(query);
-                const matchRows = h.rows.some(r => (r.s || '').toLowerCase().includes(query) || (r.c || '').toLowerCase().includes(query));
-                return matchDate || matchAssigned || matchRows;
-            });
-
-            if(filtered.length === 0) { list.innerHTML = `<p class="text-center text-slate-500 py-10">No records found.</p>`; return; }
-            
-            list.innerHTML = filtered.slice().reverse().map(h => `
-                <div class="bg-white p-3 rounded-lg shadow-sm flex items-center justify-between border-l-4 border-blue-500">
-                    <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="editReport('${h.id}')">
-                        <input type="checkbox" class="db-chk h-5 w-5 accent-blue-600" value="${h.id}" onclick="event.stopPropagation()">
-                        <div>
-                            <p class="font-bold text-xs">${h.date} | <span class="text-blue-600">${h.shift}</span></p>
-                            <p class="text-[10px] text-slate-500 uppercase">SC HEAD: ${h.assigned} (${h.rows.filter(r=>r.s).length} Sites)</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-2">
-                        <button class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded text-[10px] font-bold" onclick="duplicateReport('${h.id}')" title="Duplicate as template"><i class="fas fa-copy"></i></button>
-                        <button class="bg-red-50 hover:bg-red-100 text-red-500 p-2 rounded" onclick="deleteItem('${h.id}')" title="Delete record"><i class="fas fa-trash"></i></button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function editReport(id) {
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const data = db.find(x => x.id == id);
-            if (!data) return;
-            switchTab('entry');
-            document.getElementById('editingId').value = data.id;
-            document.getElementById('reportDate').value = data.date;
-            document.getElementById('startTime').value = data.startTime;
-            document.getElementById('endTime').value = data.endTime;
-            document.getElementById('assignedBy').value = data.assigned;
-            document.getElementById('userName').value = data.userName || "S.M.Faisal Ahmed";
-            document.getElementById('hrId').value = data.hr;
-            document.getElementById('userDesig').value = data.userDesig || "Sr Supervisor";
-            data.shift === 'DAY' ? document.getElementById('shiftDay').checked = true : document.getElementById('shiftNight').checked = true;
-            init(data.rows);
-        }
-
-        function duplicateReport(id) {
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const data = db.find(x => x.id == id);
-            if (!data) return;
-            switchTab('entry');
-            document.getElementById('editingId').value = "";
-            document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
-            document.getElementById('startTime').value = data.startTime;
-            document.getElementById('endTime').value = data.endTime;
-            document.getElementById('assignedBy').value = data.assigned;
-            document.getElementById('userName').value = data.userName || "S.M.Faisal Ahmed";
-            document.getElementById('hrId').value = data.hr;
-            document.getElementById('userDesig').value = data.userDesig || "Sr Supervisor";
-            data.shift === 'DAY' ? document.getElementById('shiftDay').checked = true : document.getElementById('shiftNight').checked = true;
-            init(data.rows);
-            alert("Report duplicated successfully as a new draft!");
-        }
-
-        function deleteItem(id) { 
-            if(confirm("Delete Permanently?")) { dbRef.child(id).remove(); renderHistory(); } 
-        }
-
-        function toggleSelectAll() {
-            const chks = document.querySelectorAll('.db-chk');
-            const allSel = Array.from(chks).every(c => c.checked);
-            chks.forEach(c => c.checked = !allSel);
-            document.getElementById('selBtn').innerText = allSel ? "Select All" : "Unselect All";
-        }
-
-        function exportToExcel() {
-            const selected = document.querySelectorAll('.db-chk:checked');
-            if (selected.length === 0) return alert("Select records.");
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const finalData = [["Date", "Shift", "Assigned By", "SL", "Client", "Site Code", "Work Details", "Category", "Assign By", "Team"]];
-            selected.forEach(chk => {
-                const h = db.find(x => x.id == chk.value);
-                if(h) h.rows.forEach((r, i) => {
-                    if(r.c || r.s) finalData.push([h.date, h.shift, h.assigned, i+1, r.c, r.s, r.w, r.cat, r.ab, r.t]);
-                });
-            });
-            const ws = XLSX.utils.aoa_to_sheet(finalData);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Reports");
-            XLSX.writeFile(wb, `Dhanmondi_SC_${Date.now()}.xlsx`);
-        }
-
-        function directPrint() {
-            const selected = document.querySelectorAll('.db-chk:checked');
-            if(selected.length === 0) return alert("Select a record.");
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const printCont = document.getElementById('printContainer');
-            printCont.innerHTML = '';
-            selected.forEach(chk => {
-                const data = db.find(x => x.id == chk.value);
-                const page = document.createElement('div');
-                page.className = 'print-page-break';
-                page.innerHTML = generatePrintHTML(data);
-                printCont.appendChild(page);
-            });
-            setTimeout(() => { window.print(); }, 500);
-        }
-
-        async function generateFinalPDF(isTelegram) {
-            const selected = document.querySelectorAll('.db-chk:checked');
-            if(selected.length === 0) return alert("Select a record.");
-            document.getElementById('loader').style.display = 'flex';
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('l', 'mm', 'a4');
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            for(let i=0; i < selected.length; i++) {
-                const data = db.find(x => x.id == selected[i].value);
-                const tempDiv = document.createElement('div');
-                tempDiv.style.width = '297mm'; tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px';
-                tempDiv.innerHTML = generatePrintHTML(data);
-                document.body.appendChild(tempDiv);
-                const canvas = await html2canvas(tempDiv, { scale: 2 });
-                if(i > 0) pdf.addPage();
-                pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, 297, 210);
-                document.body.removeChild(tempDiv);
-            }
-            if(isTelegram) {
-                const blob = pdf.output('blob');
-                const fd = new FormData();
-                fd.append('chat_id', chatId);
-                fd.append('document', blob, `Report_${Date.now()}.pdf`);
-                await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: fd });
-                alert("Telegram Sent!");
-            } else { pdf.save(`Report_${Date.now()}.pdf`); }
-            document.getElementById('loader').style.display = 'none';
-        }
-
-        function generatePrintHTML(data) {
-            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c || ''}</td><td style="color:#2563eb; font-weight:bold;">${r.s || ''}</td><td style="text-align:left; padding-left:5px; white-space:pre-wrap; word-break:break-word;">${r.w || ''}</td><td>${r.cat || ''}</td><td>${r.ab || ''}</td><td>${r.t || ''}</td></tr>`).join('');
-            return `
-            <div class="report-paper">
-                <div style="text-align:center; margin-bottom:10px;">
-                    <h1 style="font-size:38px; margin:0; letter-spacing:3px;">DHANMONDI SC</h1>
-                    <p style="font-size:10px; font-weight:bold; letter-spacing:5px; color:#666;">Daily Activity Report</p>
-                </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:15px; font-weight:bold;">
-                    <div>SC Head: ${data.assigned}<br>NAME: ${data.userName || 'S.M.Faisal Ahmed'}<br>HR ID: ${data.hr}<br>Designation: ${data.userDesig || 'Sr Supervisor'}</div>
-                    <div style="text-align:right;">Date: ${data.date}<br>From: ${data.startTime} To: ${data.endTime}<br>Shift: ${data.shift}</div>
-                </div>
-                <table style="width:100%; border-collapse:collapse; text-align:center; font-size:10px; border:1.5px solid black;">
-                    <thead><tr style="background:#f0f0f0; height:35px;"><th>SL</th><th>Client</th><th>Site Code</th><th style="width:230px;">Work Details</th><th>Category</th><th>Assign By</th><th>Team/Person</th></tr></thead>
-                    <tbody>${rowsHtml}</tbody>
-                </table>
-                <div style="display:flex; justify-content:space-between; margin-top:80px; padding:0 50px;">
-                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold; padding-top:4px;">SUBMITTED BY</div>
-                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold; padding-top:4px;">CHECKED BY</div>
-                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold; padding-top:4px;">RECEIVED BY</div>
-                </div>
-            </div>`;
-        }
-    </script>
+        function generatePrintHTML(data) {
+            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td style="text-align:left; padding-left:5px;">${r.w}</td><td>${r.cat}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
+            return `
+            <div class="report-paper">
+                <div style="text-align:center; margin-bottom:10px;">
+                    <h1 style="font-size:38px; margin:0; letter-spacing:3px;">DHANMONDI SC</h1>
+                    <p style="font-size:10px; font-weight:bold; letter-spacing:5px; color:#666;">Daily Activity Report</p>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:15px; font-weight:bold;">
+                    <div>SC Head: ${data.assigned}<br>NAME: S.M.Faisal Ahmed<br>HR ID: ${data.hr}<br>Designstion: Sr. Supervisor</div>
+                    <div style="text-align:right;">Date: ${data.date}<br>From: ${data.startTime} To: ${data.endTime}<br>Shift: ${data.shift}</div>
+                </div>
+                <table style="width:100%; border-collapse:collapse; text-align:center; font-size:10px; border:1.5px solid black;">
+                    <thead><tr style="background:#f0f0f0; height:35px;"><th>SL</th><th>Client</th><th>Site Code</th><th style="width:250px;">Work Details</th><th>Category</th><th>Assign By</th><th>Team/Person</th></tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                <div style="display:flex; justify-content:space-between; margin-top:80px; padding:0 50px;">
+                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold; pt-1;">SUBMITTED BY</div>
+                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold; pt-1;">CHECKED BY</div>
+                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold; pt-1;">RECEIVED BY</div>
+                </div>
+            </div>`;
+        }
+    </script>
 </body>
 </html>
