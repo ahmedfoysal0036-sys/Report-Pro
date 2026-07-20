@@ -14,12 +14,12 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        .report-paper { width: 297mm; min-height: 210mm; padding: 10mm; background: white; margin: auto; color: black; position: relative; }
+        .report-paper { width: 297mm; min-height: 210mm; padding: 10mm; background: white; margin: auto; color: black; position: relative; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
-        th, td { border: 1px solid black; padding: 4px 2px; text-align: center; font-size: 10px; vertical-align: middle; word-wrap: break-word; overflow-wrap: break-word; }
+        th, td { border: 1px solid black; padding: 4px 2px; text-align: center; font-size: 10px; vertical-align: middle; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; }
         .header-input { border: none; outline: none; font-weight: bold; font-size: 11px; background: transparent; border-bottom: 1px solid #ddd; }
-        .table-input { border: none; outline: none; width: 100%; text-align: center; font-size: 10px; background: transparent; }
-        .work-input { text-align: left !important; padding-left: 5px; white-space: pre-wrap; word-break: break-all; }
+        .table-input { border: none; outline: none; width: 100%; text-align: center; font-size: 10px; background: transparent; box-sizing: border-box; }
+        .work-input { text-align: left !important; padding-left: 5px; white-space: pre-wrap !important; word-wrap: break-word !important; overflow-wrap: break-word !important; word-break: break-word !important; }
         .sc-title { font-size: 38px; font-weight: 400; margin: 0; color: black; letter-spacing: 3px; text-transform: uppercase; }
         select.table-input { appearance: none; cursor: pointer; text-align-last: center; }
         @media print { .no-print { display: none !important; } body { background: white !important; } #printContainer { display: block !important; width: 100% !important; } .print-page-break { page-break-after: always; display: block !important; } @page { size: landscape; margin: 0; } }
@@ -135,7 +135,7 @@
                     <td class="font-bold bg-gray-50">${i}</td>
                     <td><input type="text" class="table-input client"></td>
                     <td><input type="text" class="table-input font-bold text-blue-600 site uppercase"></td>
-                    <td><input type="text" class="table-input work-input work"></td>
+                    <td><textarea class="table-input work-input work" rows="2" style="resize: vertical;"></textarea></td>
                     <td>
                         <select class="table-input category">
                             <option value="">-</option>
@@ -314,7 +314,7 @@
         }
 
         function generatePrintHTML(data) {
-            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td style="text-align:left; padding-left:5px; word-break:break-all; white-space:pre-wrap;">${r.w}</td><td>${r.cat}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
+            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w}</td><td>${r.cat}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
             return `
             <div class="report-paper">
                 <div style="text-align:center; margin-bottom:10px;">
