@@ -126,11 +126,22 @@
         const chatId = "682844989";
         const DB_KEY = 'prof_stable_v27_client_col';
 
+        // Assign By এর সাজেস্টেড নামগুলোর লিস্ট (প্রয়োজনে এখানে নতুন নাম যোগ করতে পারেন)
+        const assignByList = [
+            "MD Azmir Hossain",
+            "S.M.Faisal Ahmed",
+            "Supervisor",
+            "Manager",
+            "Client"
+        ];
+
         function init() {
             document.getElementById('editingId').value = "";
             const tb = document.getElementById('tableBody');
             tb.innerHTML = '';
             for(let i=1; i<=12; i++) {
+                // Assign By ফিল্ডে datalist যুক্ত করা হয়েছে যাতে ক্লিক করলেই লিস্ট আসে
+                let datalistOptions = assignByList.map(name => `<option value="${name}">`).join('');
                 tb.innerHTML += `<tr>
                     <td class="font-bold bg-gray-50">${i}</td>
                     <td><input type="text" class="table-input client"></td>
@@ -145,7 +156,12 @@
                             <option value="Others">Others</option>
                         </select>
                     </td>
-                    <td><input type="text" class="table-input assignBy"></td>
+                    <td>
+                        <input type="text" list="assignList_${i}" class="table-input assignBy">
+                        <datalist id="assignList_${i}">
+                            ${datalistOptions}
+                        </datalist>
+                    </td>
                     <td><input type="text" class="table-input team"></td>
                 </tr>`;
             }
@@ -259,7 +275,6 @@
             if (selected.length === 0) return alert("Select records.");
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
-            // এক্সেলের নির্দিষ্ট ফরম্যাট: SL | Date | Shift | In Time | Out Time | Client | Site Code | Work Details | Assigned By | Remarks
             const finalData = [
                 ["SL", "Date", "Shift", "In Time", "Out Time", "Client", "Site Code", "Work Details", "Assigned By", "Remarks"]
             ];
