@@ -77,12 +77,14 @@
                     <thead class="bg-gray-100">
                         <tr>
                             <th style="width: 30px;">SL</th>
-                            <th style="width: 120px;">Client</th>
-                            <th style="width: 100px;">Site Code</th>
-                            <th style="width: 250px;">Work Details</th>
-                            <th style="width: 90px;">Category</th>
-                            <th style="width: 100px;">Assign By</th>
-                            <th style="width: 100px;">Team/Person</th>
+                            <th style="width: 110px;">Client</th>
+                            <th style="width: 90px;">Site Code</th>
+                            <th style="width: 190px;">Work Details</th>
+                            <th style="width: 75px;">In Time</th>
+                            <th style="width: 75px;">Out Time</th>
+                            <th style="width: 80px;">Category</th>
+                            <th style="width: 90px;">Assign By</th>
+                            <th style="width: 90px;">Team/Person</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -124,7 +126,7 @@
         const dbRef = firebase.database().ref('reports');
         const botToken = "8589894169:AAFNWCOr2EDzqGkEvH-6CL9Iw6QJGdGjKTc";
         const chatId = "682844989";
-        const DB_KEY = 'prof_stable_v26_final';
+        const DB_KEY = 'prof_stable_v26_final_with_time';
 
         function init() {
             document.getElementById('editingId').value = "";
@@ -136,6 +138,8 @@
                     <td><input type="text" class="table-input client"></td>
                     <td><input type="text" class="table-input font-bold text-blue-600 site uppercase"></td>
                     <td><textarea class="table-input work-input work" rows="2" style="resize: vertical;"></textarea></td>
+                    <td><input type="time" class="table-input inTime"></td>
+                    <td><input type="time" class="table-input outTime"></td>
                     <td>
                         <select class="table-input category">
                             <option value="">-</option>
@@ -175,7 +179,8 @@
             const editingId = document.getElementById('editingId').value;
             const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
                 c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
-                w: tr.querySelector('.work').value, cat: tr.querySelector('.category').value,
+                w: tr.querySelector('.work').value, int: tr.querySelector('.inTime').value,
+                out: tr.querySelector('.outTime').value, cat: tr.querySelector('.category').value,
                 ab: tr.querySelector('.assignBy').value, t: tr.querySelector('.team').value
             }));
 
@@ -233,6 +238,8 @@
                     tableRows[i].querySelector('.client').value = row.c;
                     tableRows[i].querySelector('.site').value = row.s;
                     tableRows[i].querySelector('.work').value = row.w;
+                    tableRows[i].querySelector('.inTime').value = row.int || '';
+                    tableRows[i].querySelector('.outTime').value = row.out || '';
                     tableRows[i].querySelector('.category').value = row.cat;
                     tableRows[i].querySelector('.assignBy').value = row.ab;
                     tableRows[i].querySelector('.team').value = row.t;
@@ -255,11 +262,11 @@
             const selected = document.querySelectorAll('.db-chk:checked');
             if (selected.length === 0) return alert("Select records.");
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            const finalData = [["Date", "Shift", "Assigned By", "SL", "Client", "Site Code", "Work Details", "Category", "Assign By", "Team"]];
+            const finalData = [["Date", "Shift", "Assigned By", "SL", "Client", "Site Code", "Work Details", "In Time", "Out Time", "Category", "Assign By", "Team"]];
             selected.forEach(chk => {
                 const h = db.find(x => x.id == chk.value);
                 if(h) h.rows.forEach((r, i) => {
-                    if(r.c || r.s) finalData.push([h.date, h.shift, h.assigned, i+1, r.c, r.s, r.w, r.cat, r.ab, r.t]);
+                    if(r.c || r.s) finalData.push([h.date, h.shift, h.assigned, i+1, r.c, r.s, r.w, r.int || '', r.out || '', r.cat, r.ab, r.t]);
                 });
             });
             const ws = XLSX.utils.aoa_to_sheet(finalData);
@@ -314,7 +321,7 @@
         }
 
         function generatePrintHTML(data) {
-            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w}</td><td>${r.cat}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
+            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w}</td><td>${r.int || ''}</td><td>${r.out || ''}</td><td>${r.cat}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
             return `
             <div class="report-paper">
                 <div style="text-align:center; margin-bottom:10px;">
@@ -326,7 +333,7 @@
                     <div style="text-align:right;">Date: ${data.date}<br>From: ${data.startTime} To: ${data.endTime}<br>Shift: ${data.shift}</div>
                 </div>
                 <table style="width:100%; border-collapse:collapse; text-align:center; font-size:10px; border:1.5px solid black; table-layout:fixed;">
-                    <thead><tr style="background:#f0f0f0; height:35px;"><th>SL</th><th>Client</th><th>Site Code</th><th style="width:250px;">Work Details</th><th>Category</th><th>Assign By</th><th>Team/Person</th></tr></thead>
+                    <thead><tr style="background:#f0f0f0; height:35px;"><th>SL</th><th>Client</th><th>Site Code</th><th style="width:190px;">Work Details</th><th>In Time</th><th>Out Time</th><th>Category</th><th>Assign By</th><th>Team/Person</th></tr></thead>
                     <tbody>${rowsHtml}</tbody>
                 </table>
                 <div style="display:flex; justify-content:space-between; margin-top:80px; padding:0 50px;">
