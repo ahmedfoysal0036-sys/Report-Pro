@@ -79,7 +79,7 @@
                             <th style="width: 35px;">SL</th>
                             <th style="width: 110px;">Client</th>
                             <th style="width: 110px;">Site Code</th>
-                            <th style="width: 250px;">Work Details</th>
+                            <th style="width: 250px;">Activity Details</th>
                             <th style="width: 90px;">Category</th>
                             <th style="width: 110px;">Assign By</th>
                             <th style="width: 110px;">Team/Person</th>
@@ -126,13 +126,25 @@
         const chatId = "682844989";
         const DB_KEY = 'prof_stable_v27_client_col';
 
-        // Assign By এর সাজেস্টেড নামগুলোর লিস্ট (প্রয়োজনে এখানে নতুন নাম যোগ করতে পারেন)
+        // Assign By এর সাজেস্টেড নামগুলোর লিস্ট
         const assignByList = [
             "MD Azmir Hossain",
-            "S.M.Faisal Ahmed",
-            "Supervisor",
-            "Manager",
-            "Client"
+            "Md Zahidur Rahman",
+            "Md Mahbub Hossain",
+            "Ashik Ahmed Pial",
+            "Md Mahatab Uddin",
+            "DS Nipun"
+        ];
+
+        // Client এর সাজেস্টেড নামগুলোর লিস্ট (প্রয়োজনে এখান থেকে পরিবর্তন বা নতুন নাম যোগ করতে পারেন)
+        const clientList = [
+            "Grameen phone Limited",
+            "Robi Axiata Limited",
+            "Banglalink Digital",
+            "Teletalk Bangladesh",
+            "SCOMM",
+            "Robi Dark Fiber",
+            "Banglalink Dark Fiber"
         ];
 
         function init() {
@@ -140,26 +152,36 @@
             const tb = document.getElementById('tableBody');
             tb.innerHTML = '';
             for(let i=1; i<=12; i++) {
-                // Assign By ফিল্ডে datalist যুক্ত করা হয়েছে যাতে ক্লিক করলেই লিস্ট আসে
-                let datalistOptions = assignByList.map(name => `<option value="${name}">`).join('');
+                let assignOptions = assignByList.map(name => `<option value="${name}">`).join('');
+                let clientOptions = clientList.map(name => `<option value="${name}">`).join('');
                 tb.innerHTML += `<tr>
                     <td class="font-bold bg-gray-50">${i}</td>
-                    <td><input type="text" class="table-input client"></td>
+                    <td>
+                        <input type="text" list="clientList_${i}" class="table-input client">
+                        <datalist id="clientList_${i}">
+                            ${clientOptions}
+                        </datalist>
+                    </td>
                     <td><input type="text" class="table-input font-bold text-blue-600 site uppercase"></td>
                     <td><textarea class="table-input work-input work" rows="2" style="resize: vertical;"></textarea></td>
                     <td>
                         <select class="table-input category">
                             <option value="">-</option>
                             <option value="Operation">Operation</option>
+                            <option value="Dismantle">Dismantle</option>
                             <option value="Implementation">Implementation</option>
                             <option value="PM">PM</option>
-                            <option value="Others">Others</option>
+                            <option value="Roster Support">Roster Support</option>
+                            <option value="Team Mobilizing">Team Mobilizing</option>
+                            <option value="Reporting">Reporting</option>
+                            <option value="IMP Excel input">IMP Excel input</option>
+                            <option value="POP Activity">POP Activity</option>
                         </select>
                     </td>
                     <td>
                         <input type="text" list="assignList_${i}" class="table-input assignBy">
                         <datalist id="assignList_${i}">
-                            ${datalistOptions}
+                            ${assignOptions}
                         </datalist>
                     </td>
                     <td><input type="text" class="table-input team"></td>
@@ -206,7 +228,7 @@
 
             try {
                 await dbRef.child(dataId).set(data);
-                alert("Cloud Sync Successful!");
+                alert("Data updated Successful!");
                 init();
                 switchTab('history');
             } catch (e) { alert("Error: " + e.message); }
