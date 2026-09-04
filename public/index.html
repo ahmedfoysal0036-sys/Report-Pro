@@ -78,11 +78,11 @@
                         <tr>
                             <th style="width: 35px;">SL</th>
                             <th style="width: 110px;">Client</th>
-                            <th style="width: 110px;">Site Code</th>
-                            <th style="width: 250px;">Activity Details</th>
+                            <th style="width: 100px;">Site Code</th>
                             <th style="width: 90px;">Category</th>
-                            <th style="width: 110px;">Assign By</th>
-                            <th style="width: 110px;">Team/Person</th>
+                            <th style="width: 230px;">Activity Details</th>
+                            <th style="width: 100px;">Assign By</th>
+                            <th style="width: 100px;">Team/Person</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -126,7 +126,6 @@
         const chatId = "682844989";
         const DB_KEY = 'prof_stable_v27_client_col';
 
-        // Assign By এর সাজেস্টেড নামগুলোর লিস্ট
         const assignByList = [
             "MD Azmir Hossain",
             "Md Zahidur Rahman",
@@ -136,7 +135,6 @@
             "DS Nipun"
         ];
 
-        // Client এর সাজেস্টেড নামগুলোর লিস্ট (প্রয়োজনে এখান থেকে পরিবর্তন বা নতুন নাম যোগ করতে পারেন)
         const clientList = [
             "Grameen Phone Limited",
             "Robi Axiata Limited",
@@ -163,7 +161,6 @@
                         </datalist>
                     </td>
                     <td><input type="text" class="table-input font-bold text-blue-600 site uppercase"></td>
-                    <td><textarea class="table-input work-input work" rows="2" style="resize: vertical;"></textarea></td>
                     <td>
                         <select class="table-input category">
                             <option value="">-</option>
@@ -178,6 +175,7 @@
                             <option value="POP Activity">POP Activity</option>
                         </select>
                     </td>
+                    <td><textarea class="table-input work-input work" rows="2" style="resize: vertical;"></textarea></td>
                     <td>
                         <input type="text" list="assignList_${i}" class="table-input assignBy">
                         <datalist id="assignList_${i}">
@@ -213,7 +211,7 @@
             const editingId = document.getElementById('editingId').value;
             const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
                 c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
-                w: tr.querySelector('.work').value, cat: tr.querySelector('.category').value,
+                cat: tr.querySelector('.category').value, w: tr.querySelector('.work').value,
                 ab: tr.querySelector('.assignBy').value, t: tr.querySelector('.team').value
             }));
 
@@ -273,8 +271,8 @@
                 if(tableRows[i]) {
                     tableRows[i].querySelector('.client').value = row.c;
                     tableRows[i].querySelector('.site').value = row.s;
-                    tableRows[i].querySelector('.work').value = row.w;
                     tableRows[i].querySelector('.category').value = row.cat;
+                    tableRows[i].querySelector('.work').value = row.w;
                     tableRows[i].querySelector('.assignBy').value = row.ab;
                     tableRows[i].querySelector('.team').value = row.t;
                 }
@@ -298,7 +296,7 @@
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
             const finalData = [
-                ["SL", "Date", "Shift", "In Time", "Out Time", "Client", "Site Code", "Work Details", "Assigned By", "Remarks"]
+                ["SL", "Date", "Shift", "In Time", "Out Time", "Client", "Site Code", "Category", "Work Details", "Assigned By", "Remarks"]
             ];
 
             let globalSl = 1;
@@ -315,6 +313,7 @@
                                 h.endTime || '', 
                                 r.c || '', 
                                 r.s, 
+                                r.cat || '',
                                 r.w, 
                                 r.ab, 
                                 r.t
@@ -376,7 +375,7 @@
         }
 
         function generatePrintHTML(data) {
-            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w}</td><td>${r.cat}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
+            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td>${r.cat || ''}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
             return `
             <div class="report-paper">
                 <div style="text-align:center; margin-bottom:10px;">
@@ -388,7 +387,7 @@
                     <div style="text-align:right;">Date: ${data.date}<br>From: ${data.startTime || ''} To: ${data.endTime || ''}<br>Shift: ${data.shift}</div>
                 </div>
                 <table style="width:100%; border-collapse:collapse; text-align:center; font-size:10px; border:1.5px solid black; table-layout:fixed;">
-                    <thead><tr style="background:#f0f0f0; height:35px;"><th>SL</th><th>Client</th><th>Site Code</th><th style="width:250px;">Work Details</th><th>Category</th><th>Assign By</th><th>Team/Person</th></tr></thead>
+                    <thead><tr style="background:#f0f0f0; height:35px;"><th style="width:35px;">SL</th><th style="width:110px;">Client</th><th style="width:100px;">Site Code</th><th style="width:90px;">Category</th><th style="width:230px;">Activity Details</th><th style="width:100px;">Assign By</th><th style="width:100px;">Team/Person</th></tr></thead>
                     <tbody>${rowsHtml}</tbody>
                 </table>
                 <div style="display:flex; justify-content:space-between; margin-top:80px; padding:0 50px;">
