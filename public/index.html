@@ -259,36 +259,31 @@
             if (selected.length === 0) return alert("Select records.");
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
-            const finalData = [];
+            // একদম পরিষ্কার ফ্ল্যাট হেডার: SL | Date | Shift | In Time | Out Time | Site Code | Work Details | Assigned By | Remarks
+            const finalData = [
+                ["SL", "Date", "Shift", "In Time", "Out Time", "Site Code", "Work Details", "Assigned By", "Remarks"]
+            ];
 
+            let globalSl = 1;
             selected.forEach(chk => {
                 const h = db.find(x => x.id == chk.value);
                 if(h) {
-                    // ছবির মতো প্রতিটি রিপোর্টের জন্য উপরে Date, Shift, In Time (From), Out Time (To), SC Head সেট করা হলো
-                    finalData.push(["Date", "Shift", "In Time", "Out Time", "SC Head", "Name", "HR ID", "Designation"]);
-                    finalData.push([h.date, h.shift, h.startTime || '', h.endTime || '', h.assigned, h.name || '', h.hr || '', h.desig || '']);
-                    finalData.push([]); // গ্যাপ
-                    
-                    // টেবিলের হেডার আপনার চাওয়া ফরম্যাট অনুযায়ী: SL, Date, Shift, In Time, Out Time, Site Code, Work Details, Assigned By, Remarks
-                    finalData.push(["SL", "Date", "Shift", "In Time", "Out Time", "Site Code", "Work Details", "Assigned By", "Remarks"]);
-                    
-                    h.rows.forEach((r, i) => {
+                    h.rows.forEach((r) => {
                         if(r.c || r.s || r.w) {
+                            // কাজের বিবরণ বা রো গুলো সরাসরি একটার পর একটা নিচে সাজাবে কোনো বাড়তি হেডার ছাড়াই
                             finalData.push([
-                                i+1, 
+                                globalSl++, 
                                 h.date, 
                                 h.shift, 
                                 h.startTime || '', 
                                 h.endTime || '', 
                                 r.s, 
-                                r.w, 
+                                `Client: ${r.c || ''} | Work: ${r.w || ''}`, 
                                 r.ab, 
                                 r.t
                             ]);
                         }
                     });
-                    finalData.push([]); // রিপোর্টের মাঝে ফাঁকা লাইন
-                    finalData.push([]); 
                 }
             });
 
