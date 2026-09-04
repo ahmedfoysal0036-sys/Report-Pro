@@ -296,7 +296,7 @@
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
             const finalData = [
-                ["SL", "Date", "Shift", "In Time", "Out Time", "Client", "Site Code", "Category", "Work Details", "Assigned By", "Remarks"]
+                ["SL", "Date", "Shift", "In Time", "Out Time", "Client", "Site Code", "Category", "Activity Details", "Assigned By", "Remarks"]
             ];
 
             let globalSl = 1;
@@ -312,11 +312,11 @@
                                 h.startTime || '', 
                                 h.endTime || '', 
                                 r.c || '', 
-                                r.s, 
+                                r.s || '', 
                                 r.cat || '',
-                                r.w, 
-                                r.ab, 
-                                r.t
+                                r.w || '', 
+                                r.ab || '', 
+                                r.t || ''
                             ]);
                         }
                     });
