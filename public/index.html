@@ -259,24 +259,36 @@
             if (selected.length === 0) return alert("Select records.");
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
-            const finalData = [
-                ["DHANMONDI SC - DAILY ACTIVITY REPORT"],
-                [],
-                ["Date", "Shift", "From Time", "To Time", "SC Head", "Name", "HR ID", "Designation"],
-            ];
+            const finalData = [];
 
             selected.forEach(chk => {
                 const h = db.find(x => x.id == chk.value);
                 if(h) {
+                    // ছবির মতো প্রতিটি রিপোর্টের জন্য উপরে Date, Shift, In Time (From), Out Time (To), SC Head সেট করা হলো
+                    finalData.push(["Date", "Shift", "In Time", "Out Time", "SC Head", "Name", "HR ID", "Designation"]);
                     finalData.push([h.date, h.shift, h.startTime || '', h.endTime || '', h.assigned, h.name || '', h.hr || '', h.desig || '']);
-                    finalData.push(["SL", "Client", "Site Code", "Work Details", "Category", "Assign By", "Team/Person"]);
+                    finalData.push([]); // গ্যাপ
+                    
+                    // টেবিলের হেডার আপনার চাওয়া ফরম্যাট অনুযায়ী: SL, Date, Shift, In Time, Out Time, Site Code, Work Details, Assigned By, Remarks
+                    finalData.push(["SL", "Date", "Shift", "In Time", "Out Time", "Site Code", "Work Details", "Assigned By", "Remarks"]);
                     
                     h.rows.forEach((r, i) => {
                         if(r.c || r.s || r.w) {
-                            finalData.push([i+1, r.c, r.s, r.w, r.cat, r.ab, r.t]);
+                            finalData.push([
+                                i+1, 
+                                h.date, 
+                                h.shift, 
+                                h.startTime || '', 
+                                h.endTime || '', 
+                                r.s, 
+                                r.w, 
+                                r.ab, 
+                                r.t
+                            ]);
                         }
                     });
-                    finalData.push([]);
+                    finalData.push([]); // রিপোর্টের মাঝে ফাঁকা লাইন
+                    finalData.push([]); 
                 }
             });
 
