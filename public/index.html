@@ -63,9 +63,10 @@
                     <div class="text-right space-y-2">
                         <p class="text-[11px] font-bold">Date: <input type="date" id="reportDate" class="header-input w-32"></p>
                         <div class="flex gap-2 justify-end">
-                            <p class="text-[11px] font-bold">From: <input type="time" id="startTime" class="header-input w-20"></p>
-                            <p class="text-[11px] font-bold">To: <input type="time" id="endTime" class="header-input w-20"></p>
+                            <p class="text-[11px] font-bold">From: <input type="time" id="startTime" onchange="calculateOT()" class="header-input w-20"></p>
+                            <p class="text-[11px] font-bold">To: <input type="time" id="endTime" onchange="calculateOT()" class="header-input w-20"></p>
                         </div>
+                        <p class="text-[11px] font-bold">OT of the Day: <input type="text" id="otHours" class="header-input w-24 text-red-600 font-bold text-right" value="0 hrs"></p>
                         <div class="flex justify-end gap-3 text-[10px] font-bold no-print">
                             <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftDay" checked class="accent-black"> DAY</label>
                             <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftNight" class="accent-black"> NIGHT</label>
@@ -128,7 +129,7 @@
         const dbRef = firebase.database().ref('reports');
         const botToken = "8589894169:AAFNWCOr2EDzqGkEvH-6CL9Iw6QJGdGjKTc";
         const chatId = "682844989";
-        const DB_KEY = 'prof_stable_v27_client_col';
+        const DB_KEY = 'prof_stable_v28_ot_col';
 
         const assignByList = [
             "MD Azmir Hossain",
@@ -164,7 +165,6 @@
             "Mukter",
             "Sumon STL",
             "Selim STL",
-            "Milon Chand",
             "SA Team Member",
             "Rejaul Karim",
             "Street Fighers",
@@ -190,6 +190,28 @@
             "STL",
             "CCL"
         ];
+
+        function calculateOT() {
+            const start = document.getElementById('startTime').value;
+            const end = document.getElementById('endTime').value;
+            if(!start || !end) return;
+
+            let [sh, sm] = start.split(':').map(Number);
+            let [eh, em] = end.split(':').map(Number);
+
+            let startDate = new Date(0, 0, 0, sh, sm, 0);
+            let endDate = new Date(0, 0, 0, eh, em, 0);
+
+            if (endDate <= startDate) {
+                endDate.setDate(endDate.getDate() + 1);
+            }
+
+            let diffHours = (endDate - startDate) / (1000 * 60 * 60);
+            let ot = Math.max(0, diffHours - 9);
+            
+            // Format output nicely (e.g., 2 hrs or 2.5 hrs)
+            document.getElementById('otHours').value = ot % 1 === 0 ? ot + " hrs" : ot.toFixed(1) + " hrs";
+        }
 
         function init() {
             document.getElementById('editingId').value = "";
@@ -267,6 +289,7 @@
             document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('startTime').value = "09:00";
             document.getElementById('endTime').value = "18:00";
+            calculateOT();
         }
         init();
 
@@ -298,6 +321,7 @@
             const data = { 
                 id: dataId, date: document.getElementById('reportDate').value, 
                 startTime: document.getElementById('startTime').value, endTime: document.getElementById('endTime').value,
+                ot: document.getElementById('otHours').value,
                 hr: document.getElementById('hrId').value, assigned: document.getElementById('assignedBy').value,
                 name: document.getElementById('userName').value, desig: document.getElementById('userDesig').value,
                 shift: document.getElementById('shiftDay').checked ? 'DAY' : 'NIGHT', rows 
@@ -327,7 +351,7 @@
                     <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="editReport('${h.id}')">
                         <input type="checkbox" class="db-chk h-5 w-5" value="${h.id}" onclick="event.stopPropagation()">
                         <div>
-                            <p class="font-bold text-xs">${h.date} | Shift: ${h.shift} | Time: ${h.startTime || '--'} to ${h.endTime || '--'}</p>
+                            <p class="font-bold text-xs">${h.date} | Shift: ${h.shift} | Time: ${h.startTime || '--'} to ${h.endTime || '--'} | OT: <span class="text-red-600">${h.ot || '0 hrs'}</span></p>
                             <p class="text-[10px] text-slate-500 uppercase">SC HEAD: ${h.assigned}</p>
                         </div>
                     </div>
@@ -345,6 +369,7 @@
             document.getElementById('reportDate').value = data.date;
             document.getElementById('startTime').value = data.startTime || '09:00';
             document.getElementById('endTime').value = data.endTime || '18:00';
+            document.getElementById('otHours').value = data.ot || '0 hrs';
             document.getElementById('assignedBy').value = data.assigned;
             document.getElementById('hrId').value = data.hr;
             if(data.name) document.getElementById('userName').value = data.name;
@@ -381,7 +406,7 @@
             const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             
             const finalData = [
-                ["SL", "Date", "Shift", "In Time", "Out Time", "Client", "Site Code", "Category", "Activity Details", "Assigned By", "Remarks"]
+                ["SL", "Date", "Shift", "In Time", "Out Time", "OT", "Client", "Site Code", "Category", "Activity Details", "Assigned By", "Remarks"]
             ];
 
             let globalSl = 1;
@@ -396,6 +421,7 @@
                                 h.shift, 
                                 h.startTime || '', 
                                 h.endTime || '', 
+                                h.ot || '',
                                 r.c || '', 
                                 r.s || '', 
                                 r.cat || '',
@@ -469,7 +495,7 @@
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:15px; font-weight:bold;">
                     <div>SC Head: ${data.assigned}<br>NAME: ${data.name || 'S.M.Faisal Ahmed'}<br>HR ID: ${data.hr}<br>Designation: ${data.desig || 'Sr Supervisor'}</div>
-                    <div style="text-align:right;">Date: ${data.date}<br>From: ${data.startTime || ''} To: ${data.endTime || ''}<br>Shift: ${data.shift}</div>
+                    <div style="text-align:right;">Date: ${data.date}<br>From: ${data.startTime || ''} To: ${data.endTime || ''}<br>OT of the Day: <span style="color:#dc2626;">${data.ot || '0 hrs'}</span><br>Shift: ${data.shift}</div>
                 </div>
                 <style>
                     table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
