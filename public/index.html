@@ -132,63 +132,23 @@
         const DB_KEY = 'prof_stable_v29_ot_hm';
 
         const assignByList = [
-            "MD Azmir Hossain",
-            "Md Zahidur Rahman",
-            "Md Mahbub Hossain",
-            "Ashik Ahmed Pial",
-            "Md Mahatab Uddin",
-            "Kamruzzaman Biswas",
-            "DS Nipun"
+            "MD Azmir Hossain", "Md Zahidur Rahman", "Md Mahbub Hossain",
+            "Ashik Ahmed Pial", "Md Mahatab Uddin", "Kamruzzaman Biswas", "DS Nipun"
         ];
 
         const TeamPerson = [
-            "MD Azmir Hossain",
-            "Md Zahidur Rahman",
-            "Md Mahbub Hossain",
-            "Ashik Ahmed Pial",
-            "Md Mahatab Uddin",
-            "DS Nipun",
-            "Kamruzzaman Biswas",
-            "Milon Chand",
-            "Mehedi Hasan Tuhin",
-            "Ranjit",
-            "Shihab",
-            "SM Sohel",
-            "Jaman",
-            "Nuruzzaman",
-            "Solaiman",
-            "Poran da",
-            "Alomgir",
-            "Alim",
-            "Khokon",
-            "Aziz",
-            "Mukter",
-            "Sumon STL",
-            "Selim STL",
-            "SA Team Member",
-            "Rejaul Karim",
-            "Street Fighers",
-            "Red Dragons",
-            "Night Riders",
-            "Raising Stars",
-            "Road Warriors",
-            "N/A"
+            "MD Azmir Hossain", "Md Zahidur Rahman", "Md Mahbub Hossain", "Ashik Ahmed Pial",
+            "Md Mahatab Uddin", "DS Nipun", "Kamruzzaman Biswas", "Milon Chand", "Mehedi Hasan Tuhin",
+            "Ranjit", "Shihab", "SM Sohel", "Jaman", "Nuruzzaman", "Solaiman", "Poran da",
+            "Alomgir", "Alim", "Khokon", "Aziz", "Mukter", "Sumon STL", "Selim STL",
+            "SA Team Member", "Rejaul Karim", "Street Fighers", "Red Dragons", "Night Riders",
+            "Raising Stars", "Road Warriors", "N/A"
         ];
 
         const clientList = [
-            "Grameen Phone Limited",
-            "Robi Axiata Limited",
-            "Banglalink Digital",
-            "Teletalk Bangladesh",
-            "SCOMM",
-            "SCOMM POP",
-            "SCOMM CO-POP",
-            "Robi Dark Fiber",
-            "Banglalink Dark Fiber",
-            "Info Phase-2",
-            "Info Phase-3",
-            "STL",
-            "CCL"
+            "Grameen Phone Limited", "Robi Axiata Limited", "Banglalink Digital",
+            "Teletalk Bangladesh", "SCOMM", "SCOMM POP", "SCOMM CO-POP", "Robi Dark Fiber",
+            "Banglalink Dark Fiber", "Info Phase-2", "Info Phase-3", "STL", "CCL"
         ];
 
         function calculateOT() {
@@ -209,8 +169,7 @@
             let diffMs = endDate - startDate;
             let totalMinutes = Math.floor(diffMs / (1000 * 60));
             
-            // Subtract basic duty (9 hours = 540 minutes)
-            let otMinutes = totalMinutes - 540;
+            let otMinutes = totalMinutes - 540; // 9 hours basic duty
             if (otMinutes < 0) otMinutes = 0;
 
             let h = Math.floor(otMinutes / 60);
@@ -241,9 +200,7 @@
                     <td class="font-bold bg-gray-50">${i}</td>
                     <td>
                         <input type="text" list="clientList_${i}" class="table-input client">
-                        <datalist id="clientList_${i}">
-                            ${clientOptions}
-                        </datalist>
+                        <datalist id="clientList_${i}">${clientOptions}</datalist>
                     </td>
                     <td><input type="text" class="table-input font-bold text-blue-600 site uppercase"></td>
                     <td>
@@ -289,15 +246,11 @@
                     <td><textarea class="table-input work-input work" rows="2" style="resize: vertical;"></textarea></td>
                     <td>
                         <input type="text" list="assignList_${i}" class="table-input assignBy">
-                        <datalist id="assignList_${i}">
-                            ${assignOptions}
-                        </datalist>
+                        <datalist id="assignList_${i}">${assignOptions}</datalist>
                     </td>
                     <td>
                         <input type="text" list="teamList_${i}" class="table-input team">
-                        <datalist id="teamList_${i}">
-                            ${teamOptions}
-                        </datalist>
+                        <datalist id="teamList_${i}">${teamOptions}</datalist>
                     </td>
                 </tr>`;
             }
@@ -327,7 +280,6 @@
             document.getElementById('loader').style.display = 'flex';
             const editingId = document.getElementById('editingId').value;
             
-            // Ensure OT is freshly calculated before saving
             calculateOT();
 
             const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
@@ -389,11 +341,15 @@
             document.getElementById('startTime').value = data.startTime || '09:00';
             document.getElementById('endTime').value = data.endTime || '18:00';
             
-            // Recalculate OT correctly upon edit
-            calculateOT();
+            // Fix: Load saved OT directly instead of recalculating over it
+            if (data.ot) {
+                document.getElementById('otHours').value = data.ot;
+            } else {
+                calculateOT();
+            }
 
-            document.getElementById('assignedBy').value = data.assigned;
-            document.getElementById('hrId').value = data.hr;
+            document.getElementById('assignedBy').value = data.assigned || 'Md Azmir Hossain';
+            document.getElementById('hrId').value = data.hr || '0036';
             if(data.name) document.getElementById('userName').value = data.name;
             if(data.desig) document.getElementById('userDesig').value = data.desig;
             data.shift === 'DAY' ? document.getElementById('shiftDay').checked = true : document.getElementById('shiftNight').checked = true;
@@ -401,12 +357,12 @@
             const tableRows = document.querySelectorAll('#tableBody tr');
             data.rows.forEach((row, i) => {
                 if(tableRows[i]) {
-                    tableRows[i].querySelector('.client').value = row.c;
-                    tableRows[i].querySelector('.site').value = row.s;
-                    tableRows[i].querySelector('.category').value = row.cat;
-                    tableRows[i].querySelector('.work').value = row.w;
-                    tableRows[i].querySelector('.assignBy').value = row.ab;
-                    tableRows[i].querySelector('.team').value = row.t;
+                    tableRows[i].querySelector('.client').value = row.c || '';
+                    tableRows[i].querySelector('.site').value = row.s || '';
+                    tableRows[i].querySelector('.category').value = row.cat || '';
+                    tableRows[i].querySelector('.work').value = row.w || '';
+                    tableRows[i].querySelector('.assignBy').value = row.ab || '';
+                    tableRows[i].querySelector('.team').value = row.t || '';
                 }
             });
         }
@@ -508,7 +464,7 @@
         }
 
         function generatePrintHTML(data) {
-            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c}</td><td style="color:#2563eb; font-weight:bold;">${r.s}</td><td>${r.cat || ''}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w}</td><td>${r.ab}</td><td>${r.t}</td></tr>`).join('');
+            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c || ''}</td><td style="color:#2563eb; font-weight:bold;">${r.s || ''}</td><td>${r.cat || ''}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w || ''}</td><td>${r.ab || ''}</td><td>${r.t || ''}</td></tr>`).join('');
             return `
             <div class="report-paper">
                 <div style="text-align:center; margin-bottom:10px;">
