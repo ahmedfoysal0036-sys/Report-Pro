@@ -97,15 +97,14 @@
         </div>
         
         <div class="fixed bottom-10 right-10 flex flex-col gap-3 no-print">
-            <button onclick="init()" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700"><i class="fas fa-plus"></i></button>
-            <button onclick="saveData()" class="bg-amber-500 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all"><i class="fas fa-save text-2xl"></i></button>
+            <button onclick="init()" class="bg-slate-800 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center hover:bg-slate-700" title="Reset / New Entry"><i class="fas fa-plus"></i></button>
+            <button onclick="saveData()" class="bg-amber-500 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all" title="Save Data"><i class="fas fa-save text-2xl"></i></button>
         </div>
     </div>
 
     <div id="historySection" class="hidden p-6 max-w-4xl mx-auto no-print">
         <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
             <h2 class="text-slate-800 font-black text-xl uppercase">Cloud Sync History</h2>
-            <!-- Date Search Filter Added Here -->
             <div class="flex items-center gap-2">
                 <input type="date" id="searchDate" onchange="renderHistory()" class="bg-white border text-xs font-bold px-3 py-1 rounded shadow-sm outline-none">
                 <button onclick="document.getElementById('searchDate').value=''; renderHistory();" class="bg-slate-200 text-slate-700 px-2 py-1 rounded text-[10px] font-bold uppercase">Reset</button>
@@ -165,8 +164,8 @@
             "Sumon STL",
             "Selim STL",
             "Ullash STL"
-            
         ];
+
         const clientList = [
             "Grameen Phone Limited",
             "Robi Axiata Limited",
@@ -189,6 +188,8 @@
             for(let i=1; i<=12; i++) {
                 let assignOptions = assignByList.map(name => `<option value="${name}">`).join('');
                 let clientOptions = clientList.map(name => `<option value="${name}">`).join('');
+                let teamOptions = TeamPerson.map(name => `<option value="${name}">`).join('');
+
                 tb.innerHTML += `<tr>
                     <td class="font-bold bg-gray-50">${i}</td>
                     <td>
@@ -235,9 +236,8 @@
                             <option value="Survey">Survey</option>
                             <option value="Team Mobilizing">Team Mobilizing</option>
                             <option value="Trouble Shooting">Trouble Shooting</option>
-                            <option value="QA Issue">QA Issue</option>
                             <option value="Vertical Activity">Vertical Activity</option>
-                      </select>
+                        </select>
                     </td>
                     <td><textarea class="table-input work-input work" rows="2" style="resize: vertical;"></textarea></td>
                     <td>
@@ -246,7 +246,12 @@
                             ${assignOptions}
                         </datalist>
                     </td>
-                    <td><input type="text" class="table-input team"></td>
+                    <td>
+                        <input type="text" list="teamList_${i}" class="table-input team">
+                        <datalist id="teamList_${i}">
+                            ${teamOptions}
+                        </datalist>
+                    </td>
                 </tr>`;
             }
             document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
@@ -301,7 +306,6 @@
             let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
             const searchDate = document.getElementById('searchDate').value;
             
-            // Filter by date if selected
             if(searchDate) {
                 db = db.filter(h => h.date === searchDate);
             }
