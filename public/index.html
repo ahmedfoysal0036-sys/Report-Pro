@@ -317,12 +317,14 @@
 
             const list = document.getElementById('historyList');
             if(db.length === 0) { list.innerHTML = `<p class="text-center text-slate-500 py-10">No records found.</p>`; return; }
+            
+            // OT removed from history list view (label) as requested
             list.innerHTML = db.slice().reverse().map(h => `
                 <div class="bg-white p-3 rounded-lg shadow-sm flex items-center justify-between border-l-4 border-blue-500">
                     <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="editReport('${h.id}')">
                         <input type="checkbox" class="db-chk h-5 w-5" value="${h.id}" onclick="event.stopPropagation()">
                         <div>
-                            <p class="font-bold text-xs">${h.date} | Shift: ${h.shift} | Time: ${h.startTime || '--'} to ${h.endTime || '--'} | OT: <span class="text-red-600">${h.ot || '0 hrs'}</span></p>
+                            <p class="font-bold text-xs">${h.date} | Shift: ${h.shift} | Time: ${h.startTime || '--'} to ${h.endTime || '--'}</p>
                             <p class="text-[10px] text-slate-500 uppercase">SC HEAD: ${h.assigned}</p>
                         </div>
                     </div>
@@ -341,7 +343,6 @@
             document.getElementById('startTime').value = data.startTime || '09:00';
             document.getElementById('endTime').value = data.endTime || '18:00';
             
-            // Fix: Load saved OT directly instead of recalculating over it
             if (data.ot) {
                 document.getElementById('otHours').value = data.ot;
             } else {
