@@ -326,6 +326,10 @@
         async function saveData() {
             document.getElementById('loader').style.display = 'flex';
             const editingId = document.getElementById('editingId').value;
+            
+            // Ensure OT is freshly calculated before saving
+            calculateOT();
+
             const rows = Array.from(document.querySelectorAll('#tableBody tr')).map(tr => ({
                 c: tr.querySelector('.client').value, s: tr.querySelector('.site').value,
                 cat: tr.querySelector('.category').value, w: tr.querySelector('.work').value,
@@ -384,7 +388,10 @@
             document.getElementById('reportDate').value = data.date;
             document.getElementById('startTime').value = data.startTime || '09:00';
             document.getElementById('endTime').value = data.endTime || '18:00';
-            document.getElementById('otHours').value = data.ot || '0 hrs';
+            
+            // Recalculate OT correctly upon edit
+            calculateOT();
+
             document.getElementById('assignedBy').value = data.assigned;
             document.getElementById('hrId').value = data.hr;
             if(data.name) document.getElementById('userName').value = data.name;
