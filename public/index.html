@@ -66,7 +66,7 @@
                             <p class="text-[11px] font-bold">From: <input type="time" id="startTime" onchange="calculateOT()" class="header-input w-20"></p>
                             <p class="text-[11px] font-bold">To: <input type="time" id="endTime" onchange="calculateOT()" class="header-input w-20"></p>
                         </div>
-                        <p class="text-[11px] font-bold">OT of the Day: <input type="text" id="otHours" class="header-input w-24 text-red-600 font-bold text-right" value="0 hrs"></p>
+                        <p class="text-[11px] font-bold">OT of the Day: <input type="text" id="otHours" class="header-input w-32 text-red-600 font-bold text-right" value="0 hrs"></p>
                         <div class="flex justify-end gap-3 text-[10px] font-bold no-print">
                             <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftDay" checked class="accent-black"> DAY</label>
                             <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftNight" class="accent-black"> NIGHT</label>
@@ -129,7 +129,7 @@
         const dbRef = firebase.database().ref('reports');
         const botToken = "8589894169:AAFNWCOr2EDzqGkEvH-6CL9Iw6QJGdGjKTc";
         const chatId = "682844989";
-        const DB_KEY = 'prof_stable_v28_ot_col';
+        const DB_KEY = 'prof_stable_v29_ot_hm';
 
         const assignByList = [
             "MD Azmir Hossain",
@@ -206,11 +206,26 @@
                 endDate.setDate(endDate.getDate() + 1);
             }
 
-            let diffHours = (endDate - startDate) / (1000 * 60 * 60);
-            let ot = Math.max(0, diffHours - 9);
+            let diffMs = endDate - startDate;
+            let totalMinutes = Math.floor(diffMs / (1000 * 60));
             
-            // Format output nicely (e.g., 2 hrs or 2.5 hrs)
-            document.getElementById('otHours').value = ot % 1 === 0 ? ot + " hrs" : ot.toFixed(1) + " hrs";
+            // Subtract basic duty (9 hours = 540 minutes)
+            let otMinutes = totalMinutes - 540;
+            if (otMinutes < 0) otMinutes = 0;
+
+            let h = Math.floor(otMinutes / 60);
+            let m = otMinutes % 60;
+
+            let otString = "0 hrs";
+            if (h > 0 && m > 0) {
+                otString = `${h} hrs ${m} mins`;
+            } else if (h > 0) {
+                otString = `${h} hrs`;
+            } else if (m > 0) {
+                otString = `${m} mins`;
+            }
+            
+            document.getElementById('otHours').value = otString;
         }
 
         function init() {
