@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ahmed Activity Report | Dhanmondi SC Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-text-size-adjust: 100%; }
+        .report-paper { width: 297mm; min-height: 210mm; padding: 8mm 10mm; background: white; margin: auto; color: black; position: relative; box-sizing: border-box; }
+        
+        .header-input { border: none; outline: none; font-weight: bold; font-size: 11px; background: transparent; border-bottom: 1px solid #ddd; }
+        .sc-title { font-size: 36px; font-weight: 400; margin: 0; color: black; letter-spacing: 3px; text-transform: uppercase; }
+        
+        .btn-liquid {
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .btn-liquid::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: 0.5s;
+        }
+        .btn-liquid:hover::after { left: 100%; }
+        .btn-liquid:hover {
+            transform: translateY(-3px) scale(1.07);
+            box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.5);
+            filter: brightness(1.2);
+        }
+        .btn-liquid:active { transform: translateY(0) scale(0.95); }
+
+        .btn-new { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: #ffffff; }
+        .btn-save { background: linear-gradient(135deg, #f59e0b, #d97706); color: #0f172a; font-weight: 900; }
+        .btn-pdf { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #ffffff; }
+        .btn-excel { background: linear-gradient(135deg, #10b981, #047857); color: #ffffff; }
+        .btn-restore { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: #ffffff; }
+        .btn-print { background: linear-gradient(135deg, #64748b, #334155); color: #ffffff; }
+        .btn-recover { background: linear-gradient(135deg, #06b6d4, #0891b2); color: #ffffff; }
+        .btn-tab-active { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #ffffff; box-shadow: 0 0 15px rgba(99, 102, 241, 0.6); }
+        .btn-tab-inactive { background: linear-gradient(135deg, #1e293b, #0f172a); color: #94a3b8; }
+
+        @media screen and (max-width: 1024px) {
+            #entrySection { padding: 10px 4px !important; }
+            #mainReportArea { width: 100%; overflow-x: hidden; padding-bottom: 15px; }
+            .report-paper { width: 100% !important; min-height: auto !important; padding: 12px 8px !important; margin: 0 auto !important; }
+            .nav-arrow-btn { width: 38px !important; height: 38px !important; font-size: 14px !important; background-color: rgba(15, 23, 42, 0.9) !important; }
+            .nav-arrow-left { left: 4px !important; }
+            .nav-arrow-right { right: 4px !important; }
+        }
+
+        @media print { 
+            .no-print { display: none !important; } 
+            body { background: white !important; color: black !important; } 
+            #printContainer { display: block !important; width: 100% !important; } 
+            .print-page-break { page-break-after: always; display: block !important; } 
+            @page { size: landscape; margin: 0; } 
+        }
+        #printContainer { display: none; }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 transition-colors duration-350">
+
+    <div id="loader" class="fixed inset-0 bg-black/90 z-[9999] hidden flex-col items-center justify-center text-white">
+        <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-amber-500 mb-4"></div>
+        <p id="loaderText" class="font-bold tracking-tighter uppercase text-xs">Syncing with Cloud...</p>
+    </div>
+
+    <input type="file" id="excelRestoreInput" accept=".xlsx, .xls" class="hidden" onchange="importDataFromExcel(event)">
+
+    <nav class="bg-white dark:bg-slate-950 text-slate-800 dark:text-white p-3 sticky top-0 z-50 no-print flex justify-between items-center shadow-xl border-b border-slate-200 dark:border-slate-800 gap-2 flex-wrap">
+        <div class="flex items-center gap-3 pl-1">
+            <button onclick="toggleTheme()" class="btn-liquid bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-amber-400 w-9 h-9 rounded-full flex items-center justify-center text-xs shadow-md" title="Toggle Light/Dark Mode">
+                <i id="themeIcon" class="fas fa-moon"></i>
+            </button>
+            <div class="flex items-center gap-2">
+                <i class="fas fa-file-invoice text-amber-500 text-lg animate-pulse"></i>
+                <h1 class="font-black text-xs tracking-widest uppercase hidden sm:inline">DHANMONDI SC</h1>
+            </div>
+            <div class="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 shadow-inner">
+                <i class="fas fa-filter text-amber-500 text-[10px]"></i>
+                <span class="text-[10px] font-bold text-slate-600 dark:text-slate-300 hidden sm:inline">Filter:</span>
+                <input type="date" id="navFilterDate" onchange="filterEntryByDate(this.value)" class="bg-transparent text-slate-800 dark:text-white text-[10px] font-bold outline-none cursor-pointer">
+                <button onclick="document.getElementById('navFilterDate').value=''; init();" class="text-slate-400 hover:text-slate-800 dark:hover:text-white text-[10px] ml-1"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+
+        <div class="flex gap-2 items-center flex-wrap">
+            <button onclick="init()" class="btn-liquid btn-new px-3.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5"><i class="fas fa-plus text-amber-200"></i> New Entry</button>
+            <button onclick="saveData()" class="btn-liquid btn-save px-3.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5"><i class="fas fa-save text-slate-950"></i> SAVE</button>
+            <button onclick="forceSyncData()" class="btn-liquid btn-recover px-3 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5" title="Recover"><i class="fas fa-sync"></i> RECOVER</button>
+            <span class="text-slate-400 dark:text-slate-700 font-bold mx-0.5 hidden sm:inline">|</span>
+            <button onclick="generateFinalPDF()" class="btn-liquid btn-pdf px-3 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5"><i class="fas fa-file-pdf"></i> PDF</button>
+            <button onclick="exportToExcel()" class="btn-liquid btn-excel px-3 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5"><i class="fas fa-file-excel"></i> EXCEL</button>
+            <button onclick="document.getElementById('excelRestoreInput').click()" class="btn-liquid btn-restore px-3 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5"><i class="fas fa-file-import"></i> RESTORE</button>
+            <button onclick="directPrint()" class="btn-liquid btn-print px-3 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5"><i class="fas fa-print"></i> PRINT</button>
+            <span class="text-slate-400 dark:text-slate-700 font-bold mx-0.5 hidden sm:inline">|</span>
+            <button onclick="switchTab('history')" id="navBtnHistory" class="btn-liquid btn-tab-inactive px-4 py-1.5 rounded-lg text-[10px]">HISTORY</button>
+            <button onclick="switchTab('analytics')" id="navBtnAnalytics" class="btn-liquid btn-tab-inactive px-4 py-1.5 rounded-lg text-[10px]">MONTHLY GRAPH</button>
+        </div>
+    </nav>
+
+    <!-- ENTRY SECTION -->
+    <div id="entrySection" class="p-4 sm:p-6 relative max-w-5xl mx-auto">
+        <button onclick="navigateReport('prev')" class="btn-liquid nav-arrow-btn nav-arrow-left fixed left-4 top-1/2 -translate-y-1/2 bg-slate-800 text-white w-11 h-11 rounded-full shadow-2xl flex items-center justify-center no-print z-40 border border-slate-600"><i class="fas fa-chevron-left text-lg text-amber-400"></i></button>
+        <button onclick="navigateReport('next')" class="btn-liquid nav-arrow-btn nav-arrow-right fixed right-4 top-1/2 -translate-y-1/2 bg-slate-800 text-white w-11 h-11 rounded-full shadow-2xl flex items-center justify-center no-print z-40 border border-slate-600"><i class="fas fa-chevron-right text-lg text-amber-400"></i></button>
+
+        <div id="mainReportArea" class="space-y-4">
+            <!-- Header Card -->
+            <div class="bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-xl space-y-4 text-slate-800 dark:text-white transition-colors duration-300">
+                <input type="hidden" id="editingId" value="">
+                <div class="text-center">
+                    <h1 class="text-2xl sm:text-3xl font-black tracking-wider uppercase text-slate-900 dark:text-white">Dhanmondi Subcentre</h1>
+                    <p class="text-[10px] font-bold tracking-[0.4em] uppercase text-slate-500">Daily Activity Report</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold pt-2 border-t border-slate-100 dark:border-slate-900">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <span class="w-28 text-slate-500">SC Head:</span>
+                            <input type="text" id="assignedBy" class="header-input flex-1 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white" value="Md Azmir Hossain">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-28 text-slate-500">Name:</span>
+                            <input type="text" id="userName" class="header-input flex-1 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white" value="S.M.Faisal Ahmed">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-28 text-slate-500">HR ID:</span>
+                            <input type="text" id="hrId" class="header-input w-28 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-blue-600 dark:text-blue-400" value="0036">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-28 text-slate-500">Designation:</span>
+                            <input type="text" id="userDesig" class="header-input flex-1 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white" value="Sr Supervisor">
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-end gap-2">
+                            <span class="text-slate-500">Date:</span>
+                            <input type="date" id="reportDate" class="header-input w-36 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white">
+                        </div>
+                        <div class="flex items-center justify-end gap-2">
+                            <span class="text-slate-500">Time From / To:</span>
+                            <input type="time" id="startTime" onchange="calculateOT()" class="header-input w-24 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white text-center">
+                            <input type="time" id="endTime" onchange="calculateOT()" class="header-input w-24 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-white text-center">
+                        </div>
+                        <div class="flex items-center justify-end gap-2">
+                            <span class="text-slate-500">OT of the Day:</span>
+                            <input type="text" id="otHours" class="header-input w-36 py-1 px-2 rounded bg-slate-100 dark:bg-slate-900 text-red-600 dark:text-red-400 font-black text-right" value="0 hrs">
+                        </div>
+                        <div class="flex justify-end gap-3 text-[11px] font-bold no-print items-center flex-wrap pt-1">
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftDay" checked onchange="toggleOffDuty(false)" class="accent-amber-500"> DAY</label>
+                            <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="shiftOpt" id="shiftNight" onchange="toggleOffDuty(false)" class="accent-amber-500"> NIGHT</label>
+                            <label class="flex items-center gap-1 cursor-pointer text-amber-500"><input type="radio" name="shiftOpt" id="shiftOff" onchange="toggleOffDuty(true)" class="accent-amber-500"> OFF Duty</label>
+                            
+                            <select id="offDutyType" class="hidden text-blue-600 dark:text-cyan-400 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-900 outline-none shadow-sm cursor-pointer">
+                                <option value="Off day">Off day</option>
+                                <option value="Goverment Holiday">Goverment Holiday</option>
+                                <option value="Shifting">Shifting</option>
+                                <option value="Sick Leave">Sick Leave</option>
+                                <option value="Plan leave">Plan leave</option>
+                                <option value="Casual leave">Casual leave</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Box-style Entry Form View (Supports both Dark & Light themes perfectly) -->
+            <div id="boxContainer" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- HISTORY SECTION -->
+    <div id="historySection" class="hidden p-6 max-w-4xl mx-auto no-print">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-lg mb-6">
+            <h3 class="text-xs font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-3">
+                <i class="fas fa-calculator text-amber-500 mr-1.5"></i> Date-Wise OT Summary Generator
+            </h3>
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 rounded-lg">
+                    <span class="text-[10px] font-bold text-slate-500">FROM:</span>
+                    <input type="date" id="dateFrom" onchange="renderHistory()" class="bg-transparent text-xs font-bold text-slate-800 dark:text-white outline-none cursor-pointer">
+                </div>
+                <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 rounded-lg">
+                    <span class="text-[10px] font-bold text-slate-500">TO:</span>
+                    <input type="date" id="dateTo" onchange="renderHistory()" class="bg-transparent text-xs font-bold text-slate-800 dark:text-white outline-none cursor-pointer">
+                </div>
+                <button onclick="resetDateFilter()" class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white px-3 py-2 rounded-lg text-[10px] font-bold uppercase hover:bg-slate-300 dark:hover:bg-slate-600 transition">
+                    Reset Date Range
+                </button>
+            </div>
+
+            <div id="statementSummaryBox" class="mt-4 p-4 rounded-lg bg-gradient-to-r from-slate-900 to-slate-950 text-white border border-slate-700 flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-widest block">Selected Range Duty & OT Result</span>
+                    <p id="summaryRangeText" class="text-xs text-amber-400 font-bold mt-0.5">Showing All Records</p>
+                </div>
+                <div class="flex gap-6 items-center">
+                    <div class="text-right">
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block">Total Records</span>
+                        <span id="summaryRecordCount" class="text-lg font-black text-blue-400">0</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[9px] uppercase font-bold text-slate-400 block">Calculated Net OT</span>
+                        <span id="summaryTotalOt" class="text-xl font-black text-red-500">0 hrs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-4 gap-2 flex-wrap">
+            <h2 class="text-slate-800 dark:text-white font-black text-lg uppercase tracking-wider">Cloud Sync Records</h2>
+            <button onclick="toggleSelectAll()" id="selBtn" class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase">Select All</button>
+        </div>
+
+        <div id="historyList" class="space-y-3 mb-24"></div>
+    </div>
+
+    <!-- MONTHLY ANALYTICS / GRAPH SECTION -->
+    <div id="analyticsSection" class="hidden p-6 max-w-4xl mx-auto no-print">
+        <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl shadow-xl mb-6">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-3 border-b border-slate-200 dark:border-slate-700 pb-3">
+                <h2 class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                    <i class="fas fa-chart-bar text-amber-500"></i> Monthly Overtime & Variant Analytics
+                </h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold text-slate-500">Select Year:</span>
+                    <select id="analyticsYearSelect" onchange="renderAnalytics()" class="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs font-bold text-slate-800 dark:text-white outline-none cursor-pointer">
+                    </select>
+                </div>
+            </div>
+
+            <div id="monthlyStatsContainer" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <div id="printContainer"></div>
+
+    <script>
+        const firebaseConfig = { databaseURL: "https://infinite-v1-default-rtdb.firebaseio.com/" };
+        if(!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const dbRef = firebase.database().ref('reports');
+        const DB_KEY = 'prof_stable_v30_ot_hm';
+
+        const assignByList = [
+            "MD Azmir Hossain", "Md Zahidur Rahman", "Md Mahbub Hossain",
+            "Ashik Ahmed Pial", "Md Mahatab Uddin", "Kamruzzaman Biswas", "DS Nipun"
+        ];
+
+        const TeamPerson = [
+            "MD Azmir Hossain", "Md Zahidur Rahman", "Md Mahbub Hossain", "Ashik Ahmed Pial",
+            "Md Mahatab Uddin", "DS Nipun", "Kamruzzaman Biswas", "Milon Chand", "Mehedi Hasan Tuhin",
+            "Ranjit", "Shihab", "SM Sohel", "Jaman", "Nuruzzaman", "Solaiman", "Poran da",
+            "Alomgir", "Alim", "Khokon", "Aziz", "Mukter", "Sumon STL", "Selim STL",
+            "SA Team Member", "Rejaul Karim", "Street Fighers", "Red Dragons", "Night Riders",
+            "Raising Stars", "Road Warriors", "N/A"
+        ];
+
+        const clientList = [
+            "Grameen Phone Limited", "Robi Axiata Limited", "Banglalink Digital",
+            "Teletalk Bangladesh", "SCOMM", "SCOMM POP", "SCOMM CO-POP", "Robi Dark Fiber",
+            "Banglalink Dark Fiber", "Info Phase-2", "Info Phase-3", "STL", "CCL"
+        ];
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('themeIcon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.className = "fas fa-sun";
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                icon.className = "fas fa-moon";
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        if (localStorage.getItem('theme') === 'light') {
+            document.documentElement.classList.remove('dark');
+            document.getElementById('themeIcon').className = "fas fa-sun";
+        }
+
+        function filterEntryByDate(dt) {
+            if (!dt) return;
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const match = db.find(x => x.date === dt);
+            if (match) { editReport(match.id); } else { alert("Ei tarike kono report record paowa jayni."); }
+        }
+
+        function getCurrentFormData() {
+            if (!document.getElementById('shiftOff').checked) { calculateOT(); }
+            
+            const boxCards = document.querySelectorAll('.entry-box-card');
+            const rows = Array.from(boxCards).map(el => ({
+                c: el.querySelector('.client').value, 
+                s: el.querySelector('.site').value,
+                cat: el.querySelector('.category').value, 
+                w: el.querySelector('.work').value,
+                ab: el.querySelector('.assignBy').value, 
+                t: el.querySelector('.team').value
+            }));
+
+            let selectedShift = 'DAY';
+            if(document.getElementById('shiftNight').checked) selectedShift = 'NIGHT';
+            if(document.getElementById('shiftOff').checked) selectedShift = document.getElementById('offDutyType').value;
+
+            return {
+                id: document.getElementById('editingId').value || Date.now().toString(),
+                date: document.getElementById('reportDate').value,
+                startTime: document.getElementById('startTime').value,
+                endTime: document.getElementById('endTime').value,
+                ot: document.getElementById('otHours').value,
+                hr: document.getElementById('hrId').value,
+                assigned: document.getElementById('assignedBy').value,
+                name: document.getElementById('userName').value,
+                desig: document.getElementById('userDesig').value,
+                shift: selectedShift,
+                rows
+            };
+        }
+
+        function navigateReport(dir) {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            if (db.length === 0) { alert("Kono record paowa jayni."); return; }
+            const currentId = document.getElementById('editingId').value;
+            let index = db.findIndex(x => x.id == currentId);
+            if (index === -1) { index = dir === 'prev' ? db.length - 1 : 0; }
+            else { index = dir === 'prev' ? index - 1 : index + 1; }
+            if (index < 0) { alert("Ei ta-i prothom record."); return; }
+            if (index >= db.length) { alert("Ei ta-i sesh record."); return; }
+            editReport(db[index].id);
+        }
+
+        function toggleOffDuty(isOff) {
+            const startInput = document.getElementById('startTime');
+            const endInput = document.getElementById('endTime');
+            const offType = document.getElementById('offDutyType');
+            if (isOff) {
+                startInput.type = "text"; endInput.type = "text";
+                startInput.value = "0:00"; endInput.value = "0:00";
+                startInput.readOnly = true; endInput.readOnly = true;
+                document.getElementById('otHours').value = "0 hrs";
+                offType.classList.remove('hidden');
+            } else {
+                startInput.type = "time"; endInput.type = "time";
+                startInput.readOnly = false; endInput.readOnly = false;
+                offType.classList.add('hidden');
+                if (startInput.value === "0:00" || startInput.value === "00:00" || startInput.value === "") {
+                    startInput.value = "09:00"; endInput.value = "18:00";
+                }
+                calculateOT();
+            }
+        }
+
+        function calculateOT() {
+            if (document.getElementById('shiftOff').checked) return;
+            const start = document.getElementById('startTime').value;
+            const end = document.getElementById('endTime').value;
+            if(!start || !end) return;
+
+            let [sh, sm] = start.split(':').map(Number);
+            let [eh, em] = end.split(':').map(Number);
+            let startDate = new Date(0, 0, 0, sh, sm, 0);
+            let endDate = new Date(0, 0, 0, eh, em, 0);
+
+            if (endDate <= startDate) { endDate.setDate(endDate.getDate() + 1); }
+            let totalMinutes = Math.floor((endDate - startDate) / (1000 * 60));
+            let otMinutes = totalMinutes - 540; // 9 hours duty deduction
+            if (otMinutes < 0) otMinutes = 0;
+
+            let h = Math.floor(otMinutes / 60);
+            let m = otMinutes % 60;
+            let otString = "0 hrs";
+            if (h > 0 && m > 0) otString = `${h} hrs ${m} mins`;
+            else if (h > 0) otString = `${h} hrs`;
+            else if (m > 0) otString = `${m} mins`;
+            document.getElementById('otHours').value = otString;
+        }
+
+        function parseOtToMinutes(otStr) {
+            if (!otStr) return 0;
+            let totalM = 0;
+            let hMatch = otStr.match(/(\d+)\s*hrs?/i);
+            let mMatch = otStr.match(/(\d+)\s*mins?/i);
+            if (hMatch) totalM += parseInt(hMatch[1]) * 60;
+            if (mMatch) totalM += parseInt(mMatch[1]);
+            return totalM;
+        }
+
+        const categoryOptionsHtml = `
+            <option value="">----</option>
+            <option value="BL Dark Fiber">BL Dark Fiber</option>
+            <option value="Client Connectivity">Client Connectivity</option>
+            <option value="Capacity upgrade">Capacity upgrade</option>
+            <option value="Device Change">Device Change</option>
+            <option value="Device Power Up">Device Power Up</option>
+            <option value="Device Upgrade">Device Upgrade</option>
+            <option value="DWDM Activity">DWDM Activity</option>
+            <option value="IMP Excel input">IMP Excel input</option>
+            <option value="Implementation">Implementation</option>
+            <option value="Info POP PM">Info POP PM</option>
+            <option value="Interfacing">Interfacing</option>
+            <option value="Key Related Support">Key Related Support</option>
+            <option value="Link Upgrade">Link Upgrade</option>
+            <option value="Link Visit">Link Visit</option>
+            <option value="Link down">Link down</option>
+            <option value="Meeting">Meeting</option>
+            <option value="NCR Activity">NCR Activity</option>
+            <option value="New POP Installation">New POP Installation</option>
+            <option value="New Site Onair">New Site Onair</option>
+            <option value="ODF Installation">ODF Installation</option>
+            <option value="PAT">PAT</option>
+            <option value="PM">PM</option>
+            <option value="POP Activity">POP Activity</option>
+            <option value="QA Issue">QA Issue</option>
+            <option value="ROBI Dark Fiber">ROBI Dark Fiber</option>
+            <option value="Roster Support">Roster Support</option>
+            <option value="SFP Dismantle">SFP Dismantle</option>
+            <option value="Site Down">Site Down</option>
+            <option value="Site Visit">Site Visit</option>
+            <option value="Site Dismantle">Site Dismantle</option>
+            <option value="STL Support">STL Support</option>
+            <option value="Survey">Survey</option>
+            <option value="Team Mobilizing">Team Mobilizing</option>
+            <option value="Trouble Shooting">Trouble Shooting</option>
+            <option value="Vertical Activity">Vertical Activity</option>
+        `;
+
+        function init() {
+            document.getElementById('editingId').value = "";
+            document.getElementById('navFilterDate').value = "";
+            const boxCont = document.getElementById('boxContainer');
+            boxCont.innerHTML = '';
+
+            for(let i=1; i<=10; i++) {
+                let assignOptions = assignByList.map(name => `<option value="${name}">`).join('');
+                let clientOptions = clientList.map(name => `<option value="${name}">`).join('');
+                let teamOptions = TeamPerson.map(name => `<option value="${name}">`).join('');
+
+                boxCont.innerHTML += `
+                <div class="entry-box-card bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xl space-y-3 transition-colors duration-300">
+                    <div class="flex justify-between items-center border-b border-slate-100 dark:border-slate-900 pb-2">
+                        <span class="text-xs font-black bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-cyan-400 px-3 py-1 rounded-lg uppercase tracking-wider shadow-sm">Entry #${i}</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Client</label>
+                            <input type="text" list="box_client_${i}" class="client w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:border-amber-500">
+                            <datalist id="box_client_${i}">${clientOptions}</datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Site Code</label>
+                            <input type="text" class="site w-full uppercase font-bold text-blue-600 dark:text-cyan-300 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs outline-none focus:border-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Category</label>
+                            <select class="category w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-800 dark:text-white outline-none cursor-pointer focus:border-amber-500">${categoryOptionsHtml}</select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Activity Details</label>
+                        <textarea class="work w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:border-amber-500" rows="2" placeholder="Describe activity details here..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Assign By</label>
+                            <input type="text" list="box_assign_${i}" class="assignBy w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:border-amber-500">
+                            <datalist id="box_assign_${i}">${assignOptions}</datalist>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Team / Person</label>
+                            <input type="text" list="box_team_${i}" class="team w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-white outline-none focus:border-amber-500">
+                            <datalist id="box_team_${i}">${teamOptions}</datalist>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('startTime').value = "09:00";
+            document.getElementById('endTime').value = "18:00";
+            document.getElementById('shiftDay').checked = true;
+            toggleOffDuty(false);
+            switchTab('entry');
+        }
+
+        dbRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                const reportsArray = Object.keys(data).map(key => data[key]);
+                localStorage.setItem(DB_KEY, JSON.stringify(reportsArray));
+                if(!document.getElementById('historySection').classList.contains('hidden')) renderHistory();
+                if(!document.getElementById('analyticsSection').classList.contains('hidden')) renderAnalytics();
+            }
+        }, (error) => {
+            console.warn("Firebase sync error: ", error);
+        });
+
+        function forceSyncData() {
+            document.getElementById('loaderText').innerText = "Recovering Data...";
+            document.getElementById('loader').style.display = 'flex';
+            
+            dbRef.once('value').then((snapshot) => {
+                const data = snapshot.val();
+                if(data) {
+                    const reportsArray = Object.keys(data).map(key => data[key]);
+                    localStorage.setItem(DB_KEY, JSON.stringify(reportsArray));
+                    alert(`Data Recovery Successful! ${reportsArray.length} items recovered.`);
+                    renderHistory();
+                } else {
+                    alert("No cloud data found. Local cache will be used.");
+                }
+                document.getElementById('loader').style.display = 'none';
+            }).catch(err => {
+                alert("Network error: Loading local storage cache instead.");
+                renderHistory();
+                document.getElementById('loader').style.display = 'none';
+            });
+        }
+
+        function switchTab(t) {
+            document.getElementById('entrySection').classList.toggle('hidden', t !== 'entry');
+            document.getElementById('historySection').classList.toggle('hidden', t !== 'history');
+            document.getElementById('analyticsSection').classList.toggle('hidden', t !== 'analytics');
+            
+            const btnHist = document.getElementById('navBtnHistory');
+            const btnAnal = document.getElementById('navBtnAnalytics');
+
+            btnHist.className = t === 'history' ? "btn-liquid btn-tab-active px-4 py-1.5 rounded-lg text-[10px]" : "btn-liquid btn-tab-inactive px-4 py-1.5 rounded-lg text-[10px]";
+            btnAnal.className = t === 'analytics' ? "btn-liquid btn-tab-active px-4 py-1.5 rounded-lg text-[10px]" : "btn-liquid btn-tab-inactive px-4 py-1.5 rounded-lg text-[10px]";
+
+            if (t === 'history') renderHistory();
+            if (t === 'analytics') initAnalyticsYears();
+        }
+
+        async function saveData() {
+            document.getElementById('loaderText').innerText = "Syncing with Cloud...";
+            document.getElementById('loader').style.display = 'flex';
+            const data = getCurrentFormData();
+            
+            let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const idx = db.findIndex(x => x.id === data.id);
+            if (idx >= 0) db[idx] = data; else db.push(data);
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+
+            try {
+                await dbRef.child(data.id).set(data);
+                document.getElementById('editingId').value = data.id;
+                alert("Data updated & backed up successfully!");
+            } catch (e) { 
+                alert("Saved locally! Cloud Sync error: " + e.message); 
+            }
+            document.getElementById('loader').style.display = 'none';
+        }
+
+        function resetDateFilter() {
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            renderHistory();
+        }
+
+        function renderHistory() {
+            let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+
+            if (dateFrom && dateTo) {
+                db = db.filter(h => h.date >= dateFrom && h.date <= dateTo);
+                document.getElementById('summaryRangeText').innerText = `Date Range: ${dateFrom} to ${dateTo}`;
+            } else if (dateFrom) {
+                db = db.filter(h => h.date >= dateFrom);
+                document.getElementById('summaryRangeText').innerText = `From: ${dateFrom} onwards`;
+            } else if (dateTo) {
+                db = db.filter(h => h.date <= dateTo);
+                document.getElementById('summaryRangeText').innerText = `Up to: ${dateTo}`;
+            } else {
+                document.getElementById('summaryRangeText').innerText = "Showing All Cloud Records";
+            }
+
+            let totalMins = 0;
+            db.forEach(item => { totalMins += parseOtToMinutes(item.ot); });
+
+            let hrs = Math.floor(totalMins / 60);
+            let remM = totalMins % 60;
+            let displayOt = `${hrs} hrs ${remM} mins`;
+
+            document.getElementById('summaryRecordCount').innerText = db.length;
+            document.getElementById('summaryTotalOt').innerText = displayOt;
+
+            const list = document.getElementById('historyList');
+            if(db.length === 0) { 
+                list.innerHTML = `<p class="text-center text-slate-500 dark:text-slate-400 py-10 font-bold">No records found for selected period.</p>`; 
+                return; 
+            }
+            
+            list.innerHTML = db.slice().sort((a,b) => new Date(b.date) - new Date(a.date)).map(h => {
+                let shiftVal = h.shift || 'DAY';
+                let shiftColorClass = "text-blue-500 dark:text-blue-400 font-extrabold";
+                if (['Sick Leave', 'Plan leave', 'Casual leave'].includes(shiftVal) || shiftVal.toLowerCase().includes('leave')) {
+                    shiftColorClass = "text-red-500 dark:text-red-400 font-extrabold";
+                } else if (['Off day', 'Goverment Holiday', 'Shifting'].includes(shiftVal) || shiftVal.toLowerCase().includes('holiday') || shiftVal.toLowerCase().includes('off')) {
+                    shiftColorClass = "text-emerald-600 dark:text-emerald-400 font-extrabold";
+                } else if (shiftVal === 'DAY') {
+                    shiftColorClass = "text-amber-500 dark:text-amber-400 font-extrabold";
+                } else if (shiftVal === 'NIGHT') {
+                    shiftColorClass = "text-purple-500 dark:text-purple-400 font-extrabold";
+                }
+
+                return `
+                <div class="bg-white dark:bg-slate-800 text-slate-800 dark:text-white p-3.5 rounded-xl shadow-lg flex items-center justify-between border-l-4 border-amber-500 hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all gap-2 flex-wrap">
+                    <div class="flex items-center gap-3 flex-1 cursor-pointer" onclick="editReport('${h.id}')">
+                        <input type="checkbox" class="db-chk h-5 w-5 accent-amber-500 cursor-pointer" value="${h.id}" onclick="event.stopPropagation()">
+                        <div>
+                            <p class="font-bold text-xs">${h.date} | Shift: <span class="${shiftColorClass}">${h.shift}</span> | Time: ${h.startTime || '--'} to ${h.endTime || '--'} | OT: <span class="text-red-500 font-black">${h.ot || '0 hrs'}</span></p>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">SC HEAD: ${h.assigned}</p>
+                        </div>
+                    </div>
+                    <button class="text-red-400 hover:text-red-300 p-2 transition-transform hover:scale-125" onclick="deleteItem('${h.id}')"><i class="fas fa-trash"></i></button>
+                </div>`;
+            }).join('');
+        }
+
+        function initAnalyticsYears() {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const yearsSet = new Set();
+            db.forEach(item => {
+                if (item.date) {
+                    const yr = item.date.split('-')[0];
+                    if (yr) yearsSet.add(yr);
+                }
+            });
+            let years = Array.from(yearsSet).sort().reverse();
+            if (years.length === 0) years.push(new Date().getFullYear().toString());
+
+            const yearSelect = document.getElementById('analyticsYearSelect');
+            const currentSelected = yearSelect.value;
+            yearSelect.innerHTML = years.map(yr => `<option value="${yr}">${yr}</option>`).join('');
+            if (years.includes(currentSelected)) yearSelect.value = currentSelected;
+
+            renderAnalytics();
+        }
+
+        function renderAnalytics() {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const selectedYear = document.getElementById('analyticsYearSelect').value || new Date().getFullYear().toString();
+            const container = document.getElementById('monthlyStatsContainer');
+
+            const months = [
+                { name: "January", num: "01" }, { name: "February", num: "02" },
+                { name: "March", num: "03" }, { name: "April", num: "04" },
+                { name: "May", num: "05" }, { name: "June", num: "06" },
+                { name: "July", num: "07" }, { name: "August", num: "08" },
+                { name: "September", num: "09" }, { name: "October", num: "10" },
+                { name: "November", num: "11" }, { name: "December", num: "12" }
+            ];
+
+            let monthlyData = months.map(m => {
+                const monthReports = db.filter(item => item.date && item.date.startsWith(`${selectedYear}-${m.num}`));
+                let totalMins = 0;
+                let dayCount = 0;
+                let nightCount = 0;
+                let leaveCount = 0;
+                let offDayCount = 0;
+
+                monthReports.forEach(r => {
+                    totalMins += parseOtToMinutes(r.ot);
+                    let s = r.shift || 'DAY';
+                    if (s === 'DAY') dayCount++;
+                    else if (s === 'NIGHT') nightCount++;
+                    else if (['Sick Leave', 'Plan leave', 'Casual leave'].includes(s) || s.toLowerCase().includes('leave')) leaveCount++;
+                    else if (['Off day', 'Goverment Holiday', 'Shifting'].includes(s) || s.toLowerCase().includes('holiday') || s.toLowerCase().includes('off')) offDayCount++;
+                });
+
+                return {
+                    monthName: m.name,
+                    count: monthReports.length,
+                    dayCount,
+                    nightCount,
+                    leaveCount,
+                    offDayCount,
+                    totalMins: totalMins,
+                    otText: `${Math.floor(totalMins / 60)} hrs ${totalMins % 60} mins`
+                };
+            });
+
+            let maxMins = Math.max(...monthlyData.map(d => d.totalMins), 60);
+
+            container.innerHTML = monthlyData.map(m => {
+                let percentage = Math.min(Math.round((m.totalMins / maxMins) * 100), 100);
+                return `
+                <div class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl space-y-2">
+                    <div class="flex justify-between items-center flex-wrap gap-2">
+                        <span class="text-xs font-bold text-slate-800 dark:text-white uppercase tracking-wider">${m.monthName}</span>
+                        <div class="flex items-center gap-3 text-[11px] flex-wrap">
+                            <span class="text-amber-500 font-bold">Day: ${m.dayCount}</span>
+                            <span class="text-purple-400 font-bold">Night: ${m.nightCount}</span>
+                            <span class="text-red-400 font-bold">Leave: ${m.leaveCount}</span>
+                            <span class="text-emerald-400 font-bold">Off/Holi: ${m.offDayCount}</span>
+                            <span class="text-slate-400 font-bold">Total OT: <strong class="text-red-500">${m.otText}</strong></span>
+                        </div>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-slate-800 h-3 rounded-full overflow-hidden shadow-inner">
+                        <div class="bg-gradient-to-r from-amber-500 to-red-600 h-full rounded-full transition-all duration-700" style="width: ${percentage}%"></div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function editReport(id) {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const data = db.find(x => x.id == id);
+            if (!data) return;
+            switchTab('entry');
+            document.getElementById('editingId').value = data.id;
+            document.getElementById('reportDate').value = data.date;
+            document.getElementById('assignedBy').value = data.assigned || 'Md Azmir Hossain';
+            document.getElementById('hrId').value = data.hr || '0036';
+            if(data.name) document.getElementById('userName').value = data.name;
+            if(data.desig) document.getElementById('userDesig').value = data.desig;
+            
+            const leaveTypes = ['Off day', 'Goverment Holiday', 'Shifting', 'Sick Leave', 'Plan leave', 'Casual leave'];
+            if (data.shift === 'NIGHT') {
+                document.getElementById('shiftNight').checked = true; toggleOffDuty(false);
+            } else if (data.shift === 'DAY') {
+                document.getElementById('shiftDay').checked = true; toggleOffDuty(false);
+            } else if (leaveTypes.includes(data.shift) || data.shift.includes('OFF') || data.shift.includes('LEAVE') || data.shift.includes('Holiday')) {
+                document.getElementById('shiftOff').checked = true;
+                document.getElementById('offDutyType').value = leaveTypes.includes(data.shift) ? data.shift : 'Off day';
+                toggleOffDuty(true);
+            } else {
+                document.getElementById('shiftDay').checked = true; toggleOffDuty(false);
+            }
+
+            document.getElementById('startTime').value = data.startTime || '09:00';
+            document.getElementById('endTime').value = data.endTime || '18:00';
+            if (data.ot) { document.getElementById('otHours').value = data.ot; } else { calculateOT(); }
+            
+            const boxCards = document.querySelectorAll('.entry-box-card');
+
+            data.rows.forEach((row, i) => {
+                if(boxCards[i]) {
+                    boxCards[i].querySelector('.client').value = row.c || '';
+                    boxCards[i].querySelector('.site').value = row.s || '';
+                    boxCards[i].querySelector('.category').value = row.cat || '';
+                    boxCards[i].querySelector('.work').value = row.w || '';
+                    boxCards[i].querySelector('.assignBy').value = row.ab || '';
+                    boxCards[i].querySelector('.team').value = row.t || '';
+                }
+            });
+        }
+
+        function deleteItem(id) { 
+            if(confirm("Delete Permanently?")) { 
+                dbRef.child(id).remove(); 
+                let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+                db = db.filter(x => x.id != id);
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+                renderHistory(); 
+            } 
+        }
+
+        function toggleSelectAll() {
+            const chks = document.querySelectorAll('.db-chk');
+            if(chks.length === 0) return;
+            const allSel = Array.from(chks).every(c => c.checked);
+            chks.forEach(c => c.checked = !allSel);
+            document.getElementById('selBtn').innerText = allSel ? "Select All" : "Unselect All";
+        }
+
+        function getSelectedOrCurrentReports() {
+            const isHistoryTab = !document.getElementById('historySection').classList.contains('hidden');
+            const selected = document.querySelectorAll('.db-chk:checked');
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+
+            if (isHistoryTab) {
+                if (selected.length === 0) {
+                    alert("Doya kore export ba print korar jonno history theke select korun!");
+                    return null;
+                }
+                return Array.from(selected).map(chk => db.find(x => x.id == chk.value)).filter(Boolean);
+            } else {
+                const currentData = getCurrentFormData();
+                if (!currentData.date) {
+                    alert("Form-e kono valid report date paowa jayni!");
+                    return null;
+                }
+                return [currentData];
+            }
+        }
+
+        function exportToExcel() {
+            const reports = getSelectedOrCurrentReports();
+            if (!reports || reports.length === 0) return;
+            
+            const finalData = [["SL", "Date", "Shift", "In Time", "Out Time", "OT", "Client", "Site Code", "Category", "Activity Details", "Assigned By", "Remarks"]];
+            let globalSl = 1;
+            reports.forEach(h => {
+                if(h && h.rows) {
+                    h.rows.forEach((r) => {
+                        if(r.c || r.s || r.w) {
+                            finalData.push([globalSl++, h.date, h.shift, h.startTime || '', h.endTime || '', h.ot || '', r.c || '', r.s || '', r.cat || '', r.w || '', r.ab || '', r.t || '']);
+                        }
+                    });
+                }
+            });
+            const ws = XLSX.utils.aoa_to_sheet(finalData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Activity Report");
+            XLSX.writeFile(wb, `Dhanmondi_SC_Report_${Date.now()}.xlsx`);
+        }
+
+        function importDataFromExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            document.getElementById('loaderText').innerText = "Restoring Data...";
+            document.getElementById('loader').style.display = 'flex';
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+                    if (jsonData.length < 2) { alert("Invalid Excel File Format!"); document.getElementById('loader').style.display = 'none'; return; }
+
+                    const grouped = {};
+                    for (let i = 1; i < jsonData.length; i++) {
+                        const row = jsonData[i];
+                        if (!row || row.length === 0 || !row[1]) continue;
+                        const date = row[1];
+                        if (!grouped[date]) {
+                            grouped[date] = {
+                                date: date, shift: row[2] || 'DAY', startTime: row[3] || '09:00', endTime: row[4] || '18:00',
+                                ot: row[5] || '0 hrs', hr: '0036', assigned: 'Md Azmir Hossain', name: 'S.M.Faisal Ahmed', desig: 'Sr Supervisor', rows: []
+                            };
+                        }
+                        grouped[date].rows.push({ c: row[6] || '', s: row[7] || '', cat: row[8] || '', w: row[9] || '', ab: row[10] || '', t: row[11] || '' });
+                    }
+
+                    const dates = Object.keys(grouped);
+                    for (let dt of dates) {
+                        const item = grouped[dt];
+                        while (item.rows.length < 10) { item.rows.push({ c: '', s: '', cat: '', w: '', ab: '', t: '' }); }
+                        item.rows = item.rows.slice(0, 10);
+                        const dataId = Date.now().toString() + Math.floor(Math.random() * 1000);
+                        item.id = dataId;
+                        await dbRef.child(dataId).set(item);
+                    }
+                    alert(`Successfully Restored ${dates.length} Report Records!`);
+                    init();
+                    switchTab('history');
+                } catch (err) { alert("Restore Failed: " + err.message); }
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('excelRestoreInput').value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function directPrint() {
+            const reports = getSelectedOrCurrentReports();
+            if(!reports || reports.length === 0) return;
+            
+            const printCont = document.getElementById('printContainer');
+            printCont.innerHTML = '';
+            reports.forEach(data => {
+                const page = document.createElement('div');
+                page.className = 'print-page-break';
+                page.innerHTML = generatePrintHTML(data);
+                printCont.appendChild(page);
+            });
+            setTimeout(() => { window.print(); }, 500);
+        }
+
+        async function generateFinalPDF() {
+            const reports = getSelectedOrCurrentReports();
+            if(!reports || reports.length === 0) return;
+            
+            document.getElementById('loaderText').innerText = "Generating PDF...";
+            document.getElementById('loader').style.display = 'flex';
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('l', 'mm', 'a4');
+            
+            for(let i=0; i < reports.length; i++) {
+                const data = reports[i];
+                const tempDiv = document.createElement('div');
+                tempDiv.style.width = '297mm'; tempDiv.style.position = 'absolute'; tempDiv.style.left = '-9999px';
+                tempDiv.innerHTML = generatePrintHTML(data);
+                document.body.appendChild(tempDiv);
+                const canvas = await html2canvas(tempDiv, { scale: 2 });
+                if(i > 0) pdf.addPage();
+                pdf.addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, 297, 210);
+                document.body.removeChild(tempDiv);
+            }
+            pdf.save(`Report_${Date.now()}.pdf`);
+            document.getElementById('loader').style.display = 'none';
+        }
+
+        function generatePrintHTML(data) {
+            const leaveTypes = ['Off day', 'Goverment Holiday', 'Shifting', 'Sick Leave', 'Plan leave', 'Casual leave'];
+            let rowsHtml = data.rows.map((r, i) => `<tr><td>${i+1}</td><td>${r.c || ''}</td><td style="color:#2563eb; font-weight:bold;">${r.s || ''}</td><td>${r.cat || ''}</td><td style="text-align:left; padding-left:5px; word-break:break-word; overflow-wrap:break-word; white-space:pre-wrap;">${r.w || ''}</td><td>${r.ab || ''}</td><td>${r.t || ''}</td></tr>`).join('');
+            return `
+            <div class="report-paper">
+                <div style="text-align:center; margin-bottom:10px;">
+                    <h1 style="font-size:36px; margin:0; letter-spacing:3px;">DHANMONDI SC</h1>
+                    <p style="font-size:10px; font-weight:bold; letter-spacing:5px; color:#666;">Daily Activity Report</p>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:12px; font-weight:bold;">
+                    <div>SC Head: ${data.assigned}<br>NAME: ${data.name || 'S.M.Faisal Ahmed'}<br>HR ID: ${data.hr}<br>Designation: ${data.desig || 'Sr Supervisor'}</div>
+                    <div style="text-align:right;">Date: ${data.date}<br>From: ${data.startTime || ''} To: ${data.endTime || ''}<br>OT of the Day: <span style="color:#dc2626;">${data.ot || '0 hrs'}</span><br>Shift: <span style="${leaveTypes.includes(data.shift) || data.shift.includes('OFF') || data.shift.includes('LEAVE') || data.shift.includes('Holiday') ? 'color:#d97706;' : ''}">${data.shift}</span></div>
+                </div>
+                <style>
+                    table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
+                    th, td { border: 1px solid black; padding: 4px 3px; text-align: center; font-size: 10px; vertical-align: middle; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; }
+                </style>
+                <table>
+                    <thead><tr style="background:#f0f0f0; height:32px;"><th style="width:35px;">SL</th><th style="width:110px;">Client</th><th style="width:100px;">Site Code</th><th style="width:90px;">Category</th><th style="width:230px;">Activity Details</th><th style="width:100px;">Assign By</th><th style="width:100px;">Team/Person</th></tr></thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+                <div style="display:flex; justify-content:space-between; margin-top:40px; padding:0 50px;">
+                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold;">SUBMITTED BY</div>
+                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold;">CHECKED BY</div>
+                    <div style="border-top:1px solid black; width:150px; text-align:center; font-size:10px; font-weight:bold;">RECEIVED BY</div>
+                </div>
+            </div>`;
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            init();
+            forceSyncData();
+        });
+    </script>
+</body>
+</html>
