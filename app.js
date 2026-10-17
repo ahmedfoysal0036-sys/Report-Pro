@@ -62,6 +62,7 @@ const readPending=()=>parseJSON(store.get(PENDING_KEY),{});
 const writePending=q=>store.set(PENDING_KEY,JSON.stringify(q));
 
 /* ---------- Firebase config and authentication ---------- */
+/* Copy these values from Firebase Console > Project settings > Your apps. */
 const firebaseConfig={
   apiKey:'AIzaSyDX6cB4VW7xy33wvkYNOqntKNx76l3iJTg',
   authDomain:'infinite-v1.firebaseapp.com',
@@ -92,6 +93,7 @@ function cloneNormalized(r){return normalize(JSON.parse(JSON.stringify(r)))}
 function rowsObject(rows){const o={};rows.forEach(r=>{if(r&&r.id)o[String(r.id)]=r});return o}
 function mergeInitialRows(localRows,cloudRows){
   const map=new Map();
+  // Cloud records are loaded first; local records take precedence for legacy records without timestamps.
   [...(cloudRows||[]),...(localRows||[])].filter(Boolean).forEach(r=>{
     const c=cloneNormalized(r),id=String(c.id||'');if(!id)return;
     const old=map.get(id);
@@ -114,6 +116,7 @@ function applyCloud(val){
     firstCloudSnapshot=false;
     const localRows=parseJSON(store.get(DB_KEY),[]);
     if(!cloudRows.length&&localRows.length){
+      // Critical data-preservation guard: an empty cloud snapshot must not erase local reports.
       DB=localRows.filter(Boolean).map(normalize).sort(byDate);persistLocal();
       const q=readPending();DB.forEach(r=>{q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2}});writePending(q);
       flushPending().then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
@@ -127,6 +130,7 @@ function applyCloud(val){
   }
   const pending=readPending();
   if(Object.keys(pending).length){
+    // Keep queued local edits/deletions; merge cloud updates without discarding local work.
     DB=mergeInitialRows(DB,cloudRows);persistLocal();refreshData();setSync('pending');return;
   }
   DB=cloudRows.sort(byDate);persistLocal();refreshData();
@@ -168,21 +172,10 @@ function showTab(t){
   if(t==='analytics')initYears();
   window.scrollTo(0,0);
 }
-
-/* ---------- Theme Manager (5 Themes) ---------- */
 function applyTheme(t){
-  document.documentElement.setAttribute('data-theme', t);
-  store.set('theme', t);
-  const sel = $('themeSelector');
-  if (sel) sel.value = t;
+  document.documentElement.setAttribute('data-theme',t);
+  $('themeBtn').textContent=t==='dark'?'☀':'☾';
 }
-
-// Theme Dropdown Event Listener
-document.addEventListener('change', e => {
-  if (e.target && e.target.id === 'themeSelector') {
-    applyTheme(e.target.value);
-  }
-});
 
 /* ---------- Report form ---------- */
 const CAT_HTML='<option value="">Choose a category</option>'+CATEGORIES.map(c=>`<option>${esc(c)}</option>`).join('');
@@ -237,7 +230,7 @@ function syncShiftUI(){
   $('offType').hidden=!off;
   $('startTime').disabled=off;$('endTime').disabled=off;
   if(off){$('startTime').value='00:00';$('endTime').value='00:00'}
-  else if(!$('startTime').value\vert{}\vert{}$('startTime').value==='00:00'){$('startTime').value='09:00';$('endTime').value='18:00'}
+  else if(!$('startTime').value||$('startTime').value==='00:00'){$('startTime').value='09:00';$('endTime').value='18:00'}
   calcOT();
 }
 function applyShift(shift){
@@ -254,7 +247,8 @@ function calcOT(){
   const mins=v=>{const [h,m]=v.split(':').map(Number);return h*60+m};
   const start=mins(s);let end=mins(e);if(end<start)end+=1440;
   const duration=end-start;
-  if(duration<=0||duration>1440){$('otHours').value='Check shift time';return}$('otHours').value=fmtOT(Math.max(0,duration-DUTY_MINUTES));
+  if(duration<=0||duration>1440){$('otHours').value='Check shift time';return}
+  $('otHours').value=fmtOT(Math.max(0,duration-DUTY_MINUTES));
 }
 
 function getFormData(){
@@ -287,7 +281,8 @@ function resetFields(){
 function loadForm(d,min){
   d=normalize(d);
   resetFields();
-  $('editingId').value=d.id\vert{}\vert{}'';$('reportDate').value=d.date||todayStr();
+  $('editingId').value=d.id||'';
+  $('reportDate').value=d.date||todayStr();
   if(d.assigned)$('assignedBy').value=d.assigned;
   if(d.name)$('userName').value=d.name;
   if(d.hr)$('hrId').value=d.hr;
@@ -389,7 +384,8 @@ function filtered(){
 function renderHistory(){
   const list=filtered(),f=$('dateFrom').value,t=$('dateTo').value;
   $('sCount').textContent=list.length;
-  $('sOt').textContent=fmtOT(list.reduce((n,r)=>n+parseOT(r.ot),0));$('sRange').textContent=f&&t?`${f} to ${t}`:f?`From ${f}`:t?`Until ${t}`:'All dates';
+  $('sOt').textContent=fmtOT(list.reduce((n,r)=>n+parseOT(r.ot),0));
+  $('sRange').textContent=f&&t?`${f} to ${t}`:f?`From ${f}`:t?`Until ${t}`:'All dates';
   const box=$('historyList');
   if(!list.length){box.innerHTML='<div class="card empty">No reports match. Change the filters, or save a report to see it here.</div>';updateSelUI(list);return}
   box.innerHTML=list.map(r=>{
@@ -413,7 +409,8 @@ function updateSelUI(list){
   const valid=[...selected].filter(id=>DB.some(r=>r.id===id));
   valid.length===selected.size||(selected.clear(),valid.forEach(i=>selected.add(i)));
   const all=list.length>0&&list.every(r=>selected.has(r.id));
-  $('selBtn').textContent=all?'Unselect all':'Select all';$('delSelBtn').disabled=selected.size===0;
+  $('selBtn').textContent=all?'Unselect all':'Select all';
+  $('delSelBtn').disabled=selected.size===0;
   $('delSelBtn').textContent=selected.size?`Delete selected (${selected.size})`:'Delete selected';
 }
 
@@ -524,7 +521,7 @@ async function exportPDF(){
       host.innerHTML=reportHTML(list[i]);
       const canvas=await html2canvas(host.firstElementChild,{scale:2,backgroundColor:'#ffffff'});
       let w=297,h=canvas.height*297/canvas.width;
-      if(h>210){h=210;w=canvas.width*210/canvas.height}
+      if(h>210){h=210;w=canvas.width*210/canvas.height}      // keep proportions, never squash
       if(i>0)pdf.addPage();
       pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',(297-w)/2,0,w,h);
     }
@@ -546,7 +543,7 @@ function exportExcel(){
   const out=[XL_HEAD];let sl=1;
   list.forEach(d=>{
     const rows=normalize(d).rows.filter(rowFilled);
-    (rows.length?rows:[{}]).forEach(r=>{
+    (rows.length?rows:[{}]).forEach(r=>{      // reports with no activities (leave, off days) still export one line
       out.push([sl++,d.date,d.shift,d.startTime||'',d.endTime||'',d.ot||'',r.c||'',r.s||'',r.cat||'',r.w||'',r.ab||'',r.t||'',d.name||'',d.hr||'',d.assigned||'',d.desig||'']);
     });
   });
@@ -569,7 +566,7 @@ async function importRecords(list){
   list.forEach(raw=>{
     if(!raw||!raw.date)return;
     const r=normalize(JSON.parse(JSON.stringify(raw)));
-    const ex=DB.find(x=>x.date===r.date);
+    const ex=DB.find(x=>x.date===r.date);                 // same date = update, never duplicate
     let id=ex?ex.id:(r.id?String(r.id):'');
     if(!id||DB.some(x=>x.id===id&&x.date!==r.date))id=Date.now().toString()+(1000+seq++);
     r.id=id;
@@ -657,7 +654,8 @@ const actions={
   pdf:exportPDF,excel:exportExcel,print:printReports,
   'json-backup':exportJSON,
   restore:()=>$('restoreInput').click(),
-  sync:syncNow
+  sync:syncNow,
+  theme:()=>{const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';applyTheme(t);store.set('theme',t)}
 };
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
@@ -671,8 +669,10 @@ $('historyList').addEventListener('change',e=>{
   if(e.target.classList.contains('chk')){e.target.checked?selected.add(e.target.dataset.id):selected.delete(e.target.dataset.id);updateSelUI()}
 });
 ['hSearch','hShift','dateFrom','dateTo'].forEach(id=>$(id).addEventListener('input',renderHistory));
-$('yearSel').addEventListener('change',renderAnalytics);$('dashYear').addEventListener('change',renderDashboard);
-$('restoreInput').addEventListener('change',handleRestore);$('gotoDate').addEventListener('change',e=>{
+$('yearSel').addEventListener('change',renderAnalytics);
+$('dashYear').addEventListener('change',renderDashboard);
+$('restoreInput').addEventListener('change',handleRestore);
+$('gotoDate').addEventListener('change',e=>{
   const d=e.target.value;e.target.value='';
   if(!d)return;
   const r=DB.find(x=>x.date===d);
@@ -694,7 +694,7 @@ document.addEventListener('keydown',e=>{
 function init(){
   if(appInitialized){startCloud();return}
   appInitialized=true;
-  applyTheme(store.get('theme')||'default');
+  applyTheme(store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
   const opts=a=>a.map(x=>`<option value="${esc(x)}">`).join('');
   $('dl-client').innerHTML=opts(CLIENTS);$('dl-assign').innerHTML=opts(ASSIGN);$('dl-team').innerHTML=opts(TEAM);
   refreshData();showTab('dashboard');initDashboardYears();
@@ -706,10 +706,11 @@ function init(){
 function showAuthError(message){$('authError').textContent=message||''}
 function bootAuthenticatedUser(user){
   currentUser=user;$('authGate').hidden=true;$('app').hidden=false;
-  $('currentUser').textContent=user.email\vert{}\vert{}user.uid;$('currentUser').title=user.email||user.uid;
+  $('currentUser').textContent=user.email||user.uid;$('currentUser').title=user.email||user.uid;
   if(appInitialized)startCloud();else init();
 }
-function bootSignedOut(){stopCloud();currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}$('loginForm').addEventListener('submit',async e=>{
+function bootSignedOut(){stopCloud();currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
+$('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();showAuthError('');
   if(!firebaseReady||!auth){showAuthError('Setup required: replace the Firebase config placeholders in this file and enable Email/Password sign-in in Firebase Console.');return}
   $('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';
