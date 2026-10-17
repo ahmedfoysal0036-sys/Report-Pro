@@ -2,7 +2,7 @@
 'use strict';
 
 /* ---------- Config ---------- */
-const DB_KEY='prof_stable_v30_ot_hm';          
+const DB_KEY='prof_stable_v30_ot_hm';          // same key as the old version, so existing data loads
 const DRAFT_KEY='activity_draft_v1';
 const DEFAULTS={assigned:'Md Azmir Hossain',name:'S.M.Faisal Ahmed',hr:'0036',desig:'Sr Supervisor'};
 const DUTY_MINUTES=540;
@@ -61,7 +61,8 @@ const persistLocal=()=>store.set(DB_KEY,JSON.stringify(DB));
 const readPending=()=>parseJSON(store.get(PENDING_KEY),{});
 const writePending=q=>store.set(PENDING_KEY,JSON.stringify(q));
 
-/* ---------- Firebase config ---------- */
+/* ---------- Firebase config and authentication ---------- */
+/* Copy these values from Firebase Console > Project settings > Your apps. */
 const firebaseConfig={
   apiKey:'AIzaSyDX6cB4VW7xy33wvkYNOqntKNx76l3iJTg',
   authDomain:'infinite-v1.firebaseapp.com',
@@ -80,9 +81,8 @@ try{
     auth=firebase.auth();
     dbRef=firebase.database().ref('reports');
     firebaseReady=true;
-  }
+  }else console.warn('Firebase config needs to be completed before sign-in and cloud sync can work.');
 }catch(e){console.warn('Firebase unavailable',e)}
-
 function setSync(state){
   const p=$('syncPill');if(!p)return;
   p.className='pill '+state;
@@ -93,6 +93,7 @@ function cloneNormalized(r){return normalize(JSON.parse(JSON.stringify(r)))}
 function rowsObject(rows){const o={};rows.forEach(r=>{if(r&&r.id)o[String(r.id)]=r});return o}
 function mergeInitialRows(localRows,cloudRows){
   const map=new Map();
+  // Cloud records are loaded first; local records take precedence for legacy records without timestamps.
   [...(cloudRows||[]),...(localRows||[])].filter(Boolean).forEach(r=>{
     const c=cloneNormalized(r),id=String(c.id||'');if(!id)return;
     const old=map.get(id);
@@ -115,10 +116,11 @@ function applyCloud(val){
     firstCloudSnapshot=false;
     const localRows=parseJSON(store.get(DB_KEY),[]);
     if(!cloudRows.length&&localRows.length){
+      // Critical data-preservation guard: an empty cloud snapshot must not erase local reports.
       DB=localRows.filter(Boolean).map(normalize).sort(byDate);persistLocal();
       const q=readPending();DB.forEach(r=>{q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2}});writePending(q);
       flushPending().then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
-      refreshData();toast('Cloud was empty. Existing local reports are preserved and uploaded.','warn');return;
+      refreshData();toast('Cloud was empty. Existing local reports are being preserved and uploaded.','warn');return;
     }
     DB=mergeInitialRows(localRows,cloudRows);persistLocal();refreshData();
     const merged=rowsObject(DB);
@@ -128,6 +130,7 @@ function applyCloud(val){
   }
   const pending=readPending();
   if(Object.keys(pending).length){
+    // Keep queued local edits/deletions; merge cloud updates without discarding local work.
     DB=mergeInitialRows(DB,cloudRows);persistLocal();refreshData();setSync('pending');return;
   }
   DB=cloudRows.sort(byDate);persistLocal();refreshData();
@@ -154,7 +157,7 @@ function toast(msg,type,action){
   if(action){const b=document.createElement('button');b.textContent=action.label;b.onclick=()=>{action.fn();t.remove()};t.appendChild(b)}
   $('toasts').appendChild(t);setTimeout(()=>t.remove(),action?7000:3500);
 }
-const showLoader=t=>{$('loaderText').textContent=t\vert{}\vert{}'Working…';$('loader').hidden=false};
+const showLoader=t=>{$('loaderText').textContent=t||'Working…';$('loader').hidden=false};
 const hideLoader=()=>{$('loader').hidden=true};
 function setDirty(v){dirty=v;$('dirtyChip').hidden=!v}
 function confirmDiscard(){return !dirty||confirm('You have unsaved changes. Discard them?')}
@@ -174,7 +177,7 @@ function applyTheme(t){
   $('themeBtn').textContent=t==='dark'?'☀':'☾';
 }
 
-/* ---------- Report Form ---------- */
+/* ---------- Report form ---------- */
 const CAT_HTML='<option value="">Choose a category</option>'+CATEGORIES.map(c=>`<option>${esc(c)}</option>`).join('');
 
 function addRow(v,focus){
@@ -227,7 +230,7 @@ function syncShiftUI(){
   $('offType').hidden=!off;
   $('startTime').disabled=off;$('endTime').disabled=off;
   if(off){$('startTime').value='00:00';$('endTime').value='00:00'}
-  else if(!$('startTime').value \vert{}\vert{}$('startTime').value==='00:00'){$('startTime').value='09:00';$('endTime').value='18:00'}
+  else if(!$('startTime').value||$('startTime').value==='00:00'){$('startTime').value='09:00';$('endTime').value='18:00'}
   calcOT();
 }
 function applyShift(shift){
@@ -244,7 +247,8 @@ function calcOT(){
   const mins=v=>{const [h,m]=v.split(':').map(Number);return h*60+m};
   const start=mins(s);let end=mins(e);if(end<start)end+=1440;
   const duration=end-start;
-  if(duration<=0||duration>1440){$('otHours').value='Check shift time';return}$('otHours').value=fmtOT(Math.max(0,duration-DUTY_MINUTES));
+  if(duration<=0||duration>1440){$('otHours').value='Check shift time';return}
+  $('otHours').value=fmtOT(Math.max(0,duration-DUTY_MINUTES));
 }
 
 function getFormData(){
@@ -277,7 +281,8 @@ function resetFields(){
 function loadForm(d,min){
   d=normalize(d);
   resetFields();
-  $('editingId').value=d.id\vert{}\vert{}'';$('reportDate').value=d.date||todayStr();
+  $('editingId').value=d.id||'';
+  $('reportDate').value=d.date||todayStr();
   if(d.assigned)$('assignedBy').value=d.assigned;
   if(d.name)$('userName').value=d.name;
   if(d.hr)$('hrId').value=d.hr;
@@ -302,7 +307,7 @@ function scheduleDraft(){
   draftTimer=setTimeout(()=>{const d=getFormData();d._editing=$('editingId').value;store.set(DRAFT_KEY,JSON.stringify(d))},600);
 }
 
-/* ---------- Save / Delete ---------- */
+/* ---------- Save / delete ---------- */
 async function saveData(){
   const data=getFormData();
   if(!data.date){toast('Choose a report date first','warn');return}
@@ -319,9 +324,9 @@ async function saveData(){
   DB.sort(byDate);persistLocal();
   $('editingId').value=data.id;setDirty(false);store.del(DRAFT_KEY);
   const q=readPending();q[String(data.id)]=data;writePending(q);
-  if(!dbRef||!currentUser){hideLoader();setSync('offline');toast('Saved locally. Sign in to sync.','warn');return}
+  if(!dbRef||!currentUser){hideLoader();setSync('offline');toast('Saved locally. Sign in and configure Firebase to sync.','warn');return}
   try{await Promise.race([flushPending(),timeout(10000,'Cloud write timed out')]);toast('Report saved and synced','success')}
-  catch(e){setSync('pending');toast('Saved locally. Cloud sync pending.','warn')}
+  catch(e){setSync('pending');toast('Saved on this device. Cloud sync is pending; it will retry when connected.','warn')}
   refreshData();hideLoader();
 }
 function deleteRecords(ids){
@@ -331,9 +336,9 @@ function deleteRecords(ids){
   ids.forEach(id=>selected.delete(id));
   if(ids.includes($('editingId').value))$('editingId').value='';
   const q=readPending();ids.forEach(id=>q[String(id)]=null);writePending(q);
-  if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error');toast('Deleted locally; cloud pending.','warn')});
+  if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error');toast('Deleted locally; cloud deletion is pending.','warn')});
   undoBuf=recs;refreshData();
-  toast(`${recs.length} report(s) deleted`,'info',{label:'Undo',fn:undoDelete});
+  toast(`${recs.length} report${recs.length>1?'s':''} deleted`,'info',{label:'Undo',fn:undoDelete});
 }
 function undoDelete(){
   if(!undoBuf)return;
@@ -379,9 +384,10 @@ function filtered(){
 function renderHistory(){
   const list=filtered(),f=$('dateFrom').value,t=$('dateTo').value;
   $('sCount').textContent=list.length;
-  $('sOt').textContent=fmtOT(list.reduce((n,r)=>n+parseOT(r.ot),0));$('sRange').textContent=f&&t?`${f} to ${t}`:f?`From ${f}`:t?`Until ${t}`:'All dates';
+  $('sOt').textContent=fmtOT(list.reduce((n,r)=>n+parseOT(r.ot),0));
+  $('sRange').textContent=f&&t?`${f} to ${t}`:f?`From ${f}`:t?`Until ${t}`:'All dates';
   const box=$('historyList');
-  if(!list.length){box.innerHTML='<div class="card empty">No reports match.</div>';updateSelUI(list);return}
+  if(!list.length){box.innerHTML='<div class="card empty">No reports match. Change the filters, or save a report to see it here.</div>';updateSelUI(list);return}
   box.innerHTML=list.map(r=>{
     const sites=[...new Set((r.rows||[]).map(x=>x.s).filter(Boolean))];
     const n=(r.rows||[]).filter(rowFilled).length;
@@ -403,7 +409,8 @@ function updateSelUI(list){
   const valid=[...selected].filter(id=>DB.some(r=>r.id===id));
   valid.length===selected.size||(selected.clear(),valid.forEach(i=>selected.add(i)));
   const all=list.length>0&&list.every(r=>selected.has(r.id));
-  $('selBtn').textContent=all?'Unselect all':'Select all';$('delSelBtn').disabled=selected.size===0;
+  $('selBtn').textContent=all?'Unselect all':'Select all';
+  $('delSelBtn').disabled=selected.size===0;
   $('delSelBtn').textContent=selected.size?`Delete selected (${selected.size})`:'Delete selected';
 }
 
@@ -469,7 +476,161 @@ function refreshData(){
   if(tab==='analytics')renderAnalytics();
 }
 
-/* ---------- Actions & Event Handlers ---------- */
+/* ---------- Report paper (print + PDF) ---------- */
+function reportHTML(d){
+  d=normalize(d);
+  const rows=d.rows.filter(rowFilled);
+  const body=(rows.length?rows:[{}]).map((r,i)=>`<tr><td>${rows.length?i+1:''}</td><td>${esc(r.c)}</td><td class="site">${esc(r.s)}</td><td>${esc(r.cat)}</td><td class="l">${esc(r.w)}</td><td>${esc(r.ab)}</td><td>${esc(r.t)}</td></tr>`).join('');
+  return `<div class="rp">
+    <h1>DHANMONDI SC</h1><div class="sub">Daily Activity Report</div>
+    <div class="meta">
+      <div>SC Head: ${esc(d.assigned)}<br>Name: ${esc(d.name||DEFAULTS.name)}<br>HR ID: ${esc(d.hr)}<br>Designation: ${esc(d.desig||DEFAULTS.desig)}</div>
+      <div>Date: ${esc(d.date)}<br>From: ${esc(d.startTime)} To: ${esc(d.endTime)}<br>OT of the day: <span class="red">${esc(d.ot||'0 hrs')}</span><br>Shift: <span class="${isOffShift(d.shift)?'amber':''}">${esc(label(d.shift))}</span></div>
+    </div>
+    <table><thead><tr><th style="width:4%">SL</th><th style="width:12%">Client</th><th style="width:12%">Site code</th><th style="width:12%">Category</th><th style="width:34%">Activity details</th><th style="width:13%">Assigned by</th><th style="width:13%">Team / person</th></tr></thead><tbody>${body}</tbody></table>
+    <div class="sign"><div>SUBMITTED BY</div><div>CHECKED BY</div><div>RECEIVED BY</div></div>
+  </div>`;
+}
+function getTargets(){
+  if(tab==='history'){
+    const list=DB.filter(r=>selected.has(r.id)).sort(byDate);
+    if(!list.length){toast('Select one or more reports in History first','warn');return null}
+    return list;
+  }
+  const d=getFormData();
+  if(!d.date){toast('Choose a report date first','warn');return null}
+  return [d];
+}
+function printReports(){
+  const list=getTargets();if(!list)return;
+  $('printRoot').innerHTML=list.map(reportHTML).join('');
+  setTimeout(()=>window.print(),300);
+}
+window.addEventListener('afterprint',()=>{$('printRoot').innerHTML=''});
+
+async function exportPDF(){
+  const list=getTargets();if(!list)return;
+  if(!window.jspdf||!window.html2canvas){toast('PDF tools failed to load. Check your connection.','error');return}
+  showLoader('Creating PDF…');
+  const host=document.createElement('div');
+  host.style.cssText='position:fixed;left:-10000px;top:0;background:#fff';
+  document.body.appendChild(host);
+  try{
+    const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    for(let i=0;i<list.length;i++){
+      host.innerHTML=reportHTML(list[i]);
+      const canvas=await html2canvas(host.firstElementChild,{scale:2,backgroundColor:'#ffffff'});
+      let w=297,h=canvas.height*297/canvas.width;
+      if(h>210){h=210;w=canvas.width*210/canvas.height}      // keep proportions, never squash
+      if(i>0)pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',(297-w)/2,0,w,h);
+    }
+    const a=list[0].date,b=list[list.length-1].date;
+    pdf.save(list.length>1?`Activity_Report_${a}_to_${b}.pdf`:`Activity_Report_${a}.pdf`);
+  }catch(e){toast('PDF failed: '+e.message,'error')}
+  host.remove();hideLoader();
+}
+
+/* ---------- Excel / JSON ---------- */
+const XL_HEAD=["SL","Date","Shift","In Time","Out Time","OT","Client","Site Code","Category","Activity Details","Assigned By","Team/Person","Name","HR ID","SC Head","Designation"];
+function download(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function exportExcel(){
+  const list=getTargets();if(!list)return;
+  if(!window.XLSX){toast('Excel tools failed to load. Check your connection.','error');return}
+  const out=[XL_HEAD];let sl=1;
+  list.forEach(d=>{
+    const rows=normalize(d).rows.filter(rowFilled);
+    (rows.length?rows:[{}]).forEach(r=>{      // reports with no activities (leave, off days) still export one line
+      out.push([sl++,d.date,d.shift,d.startTime||'',d.endTime||'',d.ot||'',r.c||'',r.s||'',r.cat||'',r.w||'',r.ab||'',r.t||'',d.name||'',d.hr||'',d.assigned||'',d.desig||'']);
+    });
+  });
+  const ws=XLSX.utils.aoa_to_sheet(out);
+  ws['!cols']=[5,12,16,9,9,12,22,14,20,50,20,20,20,8,20,16].map(wch=>({wch}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Activity Report');
+  XLSX.writeFile(wb,`Dhanmondi_SC_Report_${todayStr()}.xlsx`);
+}
+function exportJSON(){
+  download(new Blob([JSON.stringify(DB,null,1)],{type:'application/json'}),`activity_backup_${todayStr()}.json`);
+  toast(`Backed up ${DB.length} reports`,'success');
+}
+function normDate(v){
+  if(typeof v==='number')return new Date(Math.round((v-25569)*86400000)).toISOString().split('T')[0];
+  const s=String(v||'').trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,10):'';
+}
+async function importRecords(list){
+  const updates={};let n=0,seq=0;
+  list.forEach(raw=>{
+    if(!raw||!raw.date)return;
+    const r=normalize(JSON.parse(JSON.stringify(raw)));
+    const ex=DB.find(x=>x.date===r.date);                 // same date = update, never duplicate
+    let id=ex?ex.id:(r.id?String(r.id):'');
+    if(!id||DB.some(x=>x.id===id&&x.date!==r.date))id=Date.now().toString()+(1000+seq++);
+    r.id=id;
+    const i=DB.findIndex(x=>x.id===id);
+    if(i>=0)DB[i]=r;else DB.push(r);
+    updates[id]=r;n++;
+  });
+  DB.sort(byDate);persistLocal();refreshData();
+  if(dbRef&&n){try{await Promise.race([dbRef.update(updates),timeout(15000)])}catch(e){toast('Imported on this device. Cloud sync will finish when online.','warn')}}
+  return n;
+}
+function recordsFromSheet(rows){
+  const H=(rows[0]||[]).map(h=>String(h||'').trim().toLowerCase());
+  const col=(names,fb)=>{for(const n of names){const i=H.indexOf(n);if(i>=0)return i}return fb};
+  const ix={date:col(['date'],1),shift:col(['shift'],2),inT:col(['in time'],3),outT:col(['out time'],4),ot:col(['ot'],5),c:col(['client'],6),s:col(['site code'],7),cat:col(['category'],8),w:col(['activity details'],9),ab:col(['assigned by'],10),t:col(['team/person','remarks'],11),name:col(['name'],-1),hr:col(['hr id'],-1),head:col(['sc head'],-1),desig:col(['designation'],-1)};
+  const g=(row,i)=>i>=0&&row[i]!=null?String(row[i]).trim():'';
+  const grouped={};
+  for(let i=1;i<rows.length;i++){
+    const row=rows[i];if(!row||!row.length)continue;
+    const date=normDate(row[ix.date]);if(!date)continue;
+    const d=grouped[date]||(grouped[date]={date,shift:g(row,ix.shift)||'DAY',startTime:g(row,ix.inT)||'09:00',endTime:g(row,ix.outT)||'18:00',ot:g(row,ix.ot)||'0 hrs',hr:g(row,ix.hr)||DEFAULTS.hr,assigned:g(row,ix.head)||DEFAULTS.assigned,name:g(row,ix.name)||DEFAULTS.name,desig:g(row,ix.desig)||DEFAULTS.desig,rows:[]});
+    const r={c:g(row,ix.c),s:g(row,ix.s),cat:g(row,ix.cat),w:g(row,ix.w),ab:g(row,ix.ab),t:g(row,ix.t)};
+    if(rowFilled(r))d.rows.push(r);
+  }
+  return Object.values(grouped);
+}
+function handleRestore(e){
+  const file=e.target.files[0];e.target.value='';
+  if(!file)return;
+  showLoader('Restoring…');
+  const reader=new FileReader();
+  const isJson=/\.json$/i.test(file.name);
+  reader.onload=async ev=>{
+    try{
+      let list;
+      if(isJson){list=parseJSON(ev.target.result,null);if(!Array.isArray(list))throw new Error('This JSON file is not a backup from this app')}
+      else{
+        const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
+        list=recordsFromSheet(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}));
+      }
+      if(!list.length)throw new Error('No reports found in this file');
+      const n=await importRecords(list);
+      toast(`Restored ${n} report${n===1?'':'s'}`,'success');showTab('history');
+    }catch(err){toast('Restore failed: '+err.message,'error')}
+    hideLoader();
+  };
+  isJson?reader.readAsText(file):reader.readAsArrayBuffer(file);
+}
+async function syncNow(){
+  if(!dbRef||!currentUser){toast('Sign in and configure Firebase to sync.','warn');return}
+  showLoader('Syncing…');
+  try{
+    await flushPending();
+    const snap=await Promise.race([dbRef.once('value'),timeout(10000,'Cloud request timed out')]);
+    const cloud=snap.val()?Object.values(snap.val()).filter(Boolean).map(normalize):[];
+    const local=parseJSON(store.get(DB_KEY),[]);
+    if(!cloud.length&&local.length){const q=readPending();local.forEach(r=>q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2});writePending(q);await flushPending()}
+    else{DB=mergeInitialRows(local,cloud);persistLocal();await dbRef.set(rowsObject(DB))}
+    refreshData();setSync('online');toast(`Sync complete: ${DB.length} reports`,'success');
+  }catch(e){console.warn(e);setSync('error');toast('Sync failed. Local reports were preserved; try again later.','warn')}
+  hideLoader();
+}
+
+/* ---------- Events ---------- */
 const actions={
   tab:b=>{if(b.dataset.tab!==tab)showTab(b.dataset.tab)},
   new:()=>newEntry(),
@@ -490,99 +651,79 @@ const actions={
     list.forEach(r=>all?selected.delete(r.id):selected.add(r.id));renderHistory();
   },
   'reset-filters':()=>{['hSearch','dateFrom','dateTo'].forEach(i=>$(i).value='');$('hShift').value='all';renderHistory()},
+  pdf:exportPDF,excel:exportExcel,print:printReports,
+  'json-backup':exportJSON,
+  restore:()=>$('restoreInput').click(),
+  sync:syncNow,
   theme:()=>{const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';applyTheme(t);store.set('theme',t)}
 };
-
-document.addEventListener('DOMContentLoaded', () => {
-  function init(){
-    if(appInitialized){startCloud();return}
-    appInitialized=true;
-    applyTheme(store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
-    const opts=a=>a.map(x=>`<option value="${esc(x)}">`).join('');
-    if($('dl-client'))$('dl-client').innerHTML=opts(CLIENTS);
-    if($('dl-assign'))$('dl-assign').innerHTML=opts(ASSIGN);
-    if($('dl-team'))$('dl-team').innerHTML=opts(TEAM);
-    refreshData();showTab('dashboard');initDashboardYears();
-    const draft=parseJSON(store.get(DRAFT_KEY),null);
-    if(draft&&draft.date){draft.id=draft._editing||'';loadForm(draft);setDirty(true);toast('Restored your unsaved draft','info')}
-    else newEntry(true);
-    startCloud();
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');
+  if(b&&actions[b.dataset.act]){
+    if(e.target.closest('#menu'))$('menu').open=false;
+    actions[b.dataset.act](b,e);return;
   }
-
-  function showAuthError(message){if($('authError'))$('authError').textContent=message||''}
-
-  function bootAuthenticatedUser(user){
-    currentUser=user;
-    if($('authGate'))$('authGate').hidden=true;
-    if($('app'))$('app').hidden=false;
-    if($('currentUser'))$('currentUser').textContent=user.email||user.uid;
-    if(appInitialized)startCloud();else init();
-  }
-
-  function bootSignedOut(){
-    stopCloud();currentUser=null;
-    if($('app'))$('app').hidden=true;
-    if($('authGate'))$('authGate').hidden=false;
-    setSync('offline');
-  }
-
-  document.addEventListener('click',e=>{
-    const b=e.target.closest('[data-act]');
-    if(b&&actions[b.dataset.act]){
-      if(e.target.closest('#menu'))$('menu').open=false;
-      actions[b.dataset.act](b,e);return;
-    }
-    if(!e.target.closest('#menu'))$('menu').open=false;
-  });
-
-  const loginForm=$('loginForm');
-  if(loginForm){
-    loginForm.addEventListener('submit',async e=>{
-      e.preventDefault();
-      showAuthError('');
-      if(!firebaseReady||!auth){showAuthError('Firebase configuration error.');return}
-      const loginBtn=$('loginBtn');
-      if(loginBtn){loginBtn.disabled=true;loginBtn.textContent='Signing in…';}
-      try{
-        await auth.signInWithEmailAndPassword($('loginEmail').value.trim(),$('loginPassword').value);
-      }catch(err){
-        showAuthError(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'?'Email or password is incorrect.':err.message);
-      }finally{
-        if(loginBtn){loginBtn.disabled=false;loginBtn.textContent='Sign in';}
-      }
-    });
-  }
-
-  const resetBtn=$('resetPasswordBtn');
-  if(resetBtn){
-    resetBtn.addEventListener('click',async()=>{
-      showAuthError('');
-      if(!firebaseReady||!auth){showAuthError('Firebase configuration error.');return}
-      const email=$('loginEmail').value.trim();
-      if(!email){showAuthError('Enter your work email first.');return}
-      try{
-        await auth.sendPasswordResetEmail(email);
-        showAuthError('Password reset email sent if the account exists.');
-      }catch(err){showAuthError(err.message)}
-    });
-  }
-
-  const signOutBtn=$('signOutBtn');
-  if(signOutBtn){
-    signOutBtn.addEventListener('click',async()=>{
-      if(dirty&&!confirmDiscard())return;
-      try{await auth.signOut()}catch(err){toast('Could not sign out: '+err.message,'error')}
-    });
-  }
-
-  if(firebaseReady&&auth){
-    auth.onAuthStateChanged(user=>{
-      if(user) bootAuthenticatedUser(user);
-      else bootSignedOut();
-    });
-  }else{
-    bootSignedOut();
-  }
+  if(!e.target.closest('#menu'))$('menu').open=false;
+});
+$('historyList').addEventListener('change',e=>{
+  if(e.target.classList.contains('chk')){e.target.checked?selected.add(e.target.dataset.id):selected.delete(e.target.dataset.id);updateSelUI()}
+});
+['hSearch','hShift','dateFrom','dateTo'].forEach(id=>$(id).addEventListener('input',renderHistory));
+$('yearSel').addEventListener('change',renderAnalytics);
+$('dashYear').addEventListener('change',renderDashboard);
+$('restoreInput').addEventListener('change',handleRestore);
+$('gotoDate').addEventListener('change',e=>{
+  const d=e.target.value;e.target.value='';
+  if(!d)return;
+  const r=DB.find(x=>x.date===d);
+  if(!r){toast(`No report saved for ${d}`,'info');return}
+  if(confirmDiscard())openRecord(r);
+});
+const form=$('reportForm');
+['input','change'].forEach(ev=>form.addEventListener(ev,e=>{
+  if(e.target.id==='startTime'||e.target.id==='endTime')calcOT();
+  if(e.target.name==='shift')syncShiftUI();
+  setDirty(true);scheduleDraft();
+}));
+form.addEventListener('focusout',e=>{if(e.target.classList.contains('site'))e.target.value=e.target.value.trim().toUpperCase()});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&tab==='report'){e.preventDefault();saveData()}
 });
 
+/* ---------- Init and authentication ---------- */
+function init(){
+  if(appInitialized){startCloud();return}
+  appInitialized=true;
+  applyTheme(store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+  const opts=a=>a.map(x=>`<option value="${esc(x)}">`).join('');
+  $('dl-client').innerHTML=opts(CLIENTS);$('dl-assign').innerHTML=opts(ASSIGN);$('dl-team').innerHTML=opts(TEAM);
+  refreshData();showTab('dashboard');initDashboardYears();
+  const draft=parseJSON(store.get(DRAFT_KEY),null);
+  if(draft&&draft.date){draft.id=draft._editing||'';loadForm(draft);setDirty(true);toast('Restored your unsaved draft','info')}
+  else newEntry(true);
+  startCloud();
+}
+function showAuthError(message){$('authError').textContent=message||''}
+function bootAuthenticatedUser(user){
+  currentUser=user;$('authGate').hidden=true;$('app').hidden=false;
+  $('currentUser').textContent=user.email||user.uid;$('currentUser').title=user.email||user.uid;
+  if(appInitialized)startCloud();else init();
+}
+function bootSignedOut(){stopCloud();currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();showAuthError('');
+  if(!firebaseReady||!auth){showAuthError('Setup required: replace the Firebase config placeholders in this file and enable Email/Password sign-in in Firebase Console.');return}
+  $('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';
+  try{await auth.signInWithEmailAndPassword($('loginEmail').value.trim(),$('loginPassword').value)}
+  catch(err){showAuthError(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'?'Email or password is incorrect.':err.message)}
+  finally{$('loginBtn').disabled=false;$('loginBtn').textContent='Sign in'}
+});
+$('resetPasswordBtn').addEventListener('click',async()=>{
+  showAuthError('');if(!firebaseReady||!auth){showAuthError('Configure Firebase first, then reset your password.');return}
+  const email=$('loginEmail').value.trim();if(!email){showAuthError('Enter your work email first.');return}
+  try{await auth.sendPasswordResetEmail(email);showAuthError('Password reset email sent if the account exists.')}catch(err){showAuthError(err.message)}
+});
+$('signOutBtn').addEventListener('click',async()=>{if(dirty&&!confirmDiscard())return;try{await auth.signOut()}catch(err){toast('Could not sign out: '+err.message,'error')}});
+if(firebaseReady&&auth)auth.onAuthStateChanged(user=>{if(user)bootAuthenticatedUser(user);else bootSignedOut()});
+else{bootSignedOut();showAuthError('Setup required: replace the Firebase config placeholders in index.html and enable Email/Password sign-in in Firebase Console.')}
 })();
