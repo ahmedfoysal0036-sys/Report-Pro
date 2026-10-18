@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "reports": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$reportId": {
+        ".validate": "newData.hasChildren(['id', 'date', 'shift'])"
+      }
+    }
+  }
+}
