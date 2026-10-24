@@ -532,3 +532,8 @@ table.data tbody tr:hover td{background:var(--surface-2)}
 
 /* Brand logo image */
 .brand-logo-img{width:42px;height:42px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff}
+
+/* Gentle logo animation (no SVG needed) */
+@keyframes logoPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+.brand-logo-img{animation:logoPulse 3.5s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.brand-logo-img{animation:none}}
