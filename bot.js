@@ -9,7 +9,7 @@ app.get('/', (req, res) => {
   res.send('🤖 Telegram Form-based AI Bot is Active and Running 24/7!');
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🌐 Keep-alive HTTP server running on port ${PORT}`);
 });
 
@@ -37,9 +37,27 @@ if (typeof TelegramBot !== 'function') {
 }
 
 // Bot Credentials & Firebase Configuration
-const TOKEN = '8684300697:AAFMHJpvfLdROY7b7Xk0TWaxtYT6QVx2FmU';
-const FIREBASE_DB_URL = 'https://infinite-v1-default-rtdb.firebaseio.com';
-const bot = new TelegramBot(TOKEN, { polling: true });
+const TOKEN = process.env.TOKEN || '8684300697:AAFMHJpvfLdROY7b7Xk0TWaxtYT6QVx2FmU';
+const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL || 'https://infinite-v1-default-rtdb.firebaseio.com';
+
+// Improved Polling Configuration
+const bot = new TelegramBot(TOKEN, { 
+  polling: {
+    autoStart: true,
+    params: {
+      timeout: 10
+    }
+  } 
+});
+
+// Prevent Unhandled Polling Error Crash
+bot.on('polling_error', (error) => {
+  if (error.code === 'ETELEGRAM' && error.message.includes('409 Conflict')) {
+    console.log('⚠️ Polling conflict detected (another instance restarting). Retrying...');
+  } else {
+    console.error('⚠️ Polling Error:', error.message || error);
+  }
+});
 
 // Active user report frames
 const activeFrames = {};
@@ -55,7 +73,6 @@ function normalizeTime(timeInput) {
   if (!timeInput) return '09:00';
   let str = timeInput.trim().toUpperCase();
   
-  // Check for AM/PM
   const isPM = str.includes('PM');
   const isAM = str.includes('AM');
   str = str.replace(/(AM|PM)/g, '').trim();
@@ -97,7 +114,7 @@ async function saveToFirebase(reportData) {
   reportData.updatedAt = Date.now();
   reportData.schemaVersion = 2;
 
-  const url = `${FIREBASE_DB_URL}/reports/${id}.json`;
+  const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports/${id}.json`;
   try {
     const response = await fetch(url, {
       method: 'PUT',
@@ -129,12 +146,7 @@ bot.on('message', async (msg) => {
       rows: []
     };
 
-    bot.sendMessage(chatId, `📋 *NEW REPORT FRAME STARTED*
-
-Date: ${todayStr()}
-From: [Enter Start Time, e.g. 09:00]
-
-Please reply with your duty *Start Time* (e.g. 09:00):`);
+    bot.sendMessage(chatId, `📋 *NEW REPORT FRAME STARTED*\n\nDate: ${todayStr()}\nFrom: [Enter Start Time, e.g. 09:00]\n\nPlease reply with your duty *Start Time* (e.g. 09:00):`, { parse_mode: 'Markdown' });
     return;
   }
 
@@ -149,32 +161,13 @@ Please reply with your duty *Start Time* (e.g. 09:00):`);
     frame.startTime = normalizeTime(text);
     frame.step = 'READY_FOR_ACTIVITY';
 
-    bot.sendMessage(chatId, `✅ *Start Time Set: ${frame.startTime}*
-
-Aro activity jog korte template puron kore pathan ba *"add"* command din.
-
-*Activity Format:*
-Client: 
-Site code: 
-Category: 
-Activity details: 
-Assigned by: 
-Team person: `);
+    bot.sendMessage(chatId, `✅ *Start Time Set: ${frame.startTime}*\n\nAro activity jog korte template puron kore pathan ba *"add"* command din.\n\n*Activity Format:*\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
     return;
   }
 
   // 3. ADD NEW ACTIVITY LOG FRAME
   if (lowerText === 'add') {
-    bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*
-
-Pura structure copy kore fill-up kore pathan:
-
-Client: 
-Site code: 
-Category: 
-Activity details: 
-Assigned by: 
-Team person: `);
+    bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*\n\nPura structure copy kore fill-up kore pathan:\n\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
     return;
   }
 
@@ -197,17 +190,7 @@ Team person: `);
 
     frame.rows.push(rowObj);
 
-    bot.sendMessage(chatId, `✅ *Activity ${frame.rows.length} Added!*
-
-🏢 Client: ${rowObj.c || 'N/A'}
-📍 Site Code: ${rowObj.s || 'N/A'}
-🏷 Category: ${rowObj.cat}
-📝 Details: ${rowObj.w}
-👤 Assigned By: ${rowObj.ab}
-👥 Team: ${rowObj.t}
-
-Aro activity jog korte *"add"* likhun ba format fill-up korun.
-Report sesh korte *"end"* likhun.`);
+    bot.sendMessage(chatId, `✅ *Activity ${frame.rows.length} Added!*\n\n🏢 Client: ${rowObj.c || 'N/A'}\n📍 Site Code: ${rowObj.s || 'N/A'}\n🏷 Category: ${rowObj.cat}\n📝 Details: ${rowObj.w}\n👤 Assigned By: ${rowObj.ab}\n👥 Team: ${rowObj.t}\n\nAro activity jog korte *"add"* likhun ba format fill-up korun.\nReport sesh korte *"end"* likhun.`, { parse_mode: 'Markdown' });
     return;
   }
 
@@ -219,9 +202,7 @@ Report sesh korte *"end"* likhun.`);
     }
 
     frame.step = 'WAITING_FOR_END_TIME';
-    bot.sendMessage(chatId, `⏹ *FINISHING REPORT*
-
-Please enter your duty *End Time / To* (e.g. 18:00 or 11:00):`);
+    bot.sendMessage(chatId, `⏹ *FINISHING REPORT*\n\nPlease enter your duty *End Time / To* (e.g. 18:00 or 11:00):`, { parse_mode: 'Markdown' });
     return;
   }
 
@@ -252,20 +233,19 @@ Please enter your duty *End Time / To* (e.g. 18:00 or 11:00):`);
       delete activeFrames[chatId];
       let summaryText = finalReport.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
 
-      bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY SUBMITTED!*
-
-📅 *Date:* ${finalReport.date}
-⏰ *From:* ${finalReport.startTime}
-⏱ *To:* ${finalReport.endTime}
-⌛ *Total OT:* ${finalReport.ot}
-
---- *SUMMARY* ---
-${summaryText}`);
+      bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY SUBMITTED!*\n\n📅 *Date:* ${finalReport.date}\n⏰ *From:* ${finalReport.startTime}\n⏱ *To:* ${finalReport.endTime}\n⌛ *Total OT:* ${finalReport.ot}\n\n--- *SUMMARY* ---\n${summaryText}`, { parse_mode: 'Markdown' });
     } else {
       bot.sendMessage(chatId, `❌ Firebase save failed! Check connection and try typing end time again.`);
     }
     return;
   }
+});
+
+// Graceful Shutdown for Render
+process.on('SIGTERM', () => {
+  console.log('👋 SIGTERM received, stopping polling...');
+  bot.stopPolling();
+  server.close(() => process.exit(0));
 });
 
 console.log('🤖 Dynamic Form-based Telegram Bot is running...');
