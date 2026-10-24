@@ -529,3 +529,6 @@ table.data tbody tr:hover td{background:var(--surface-2)}
   .rp{break-after:page;page-break-after:always}
   .rp:last-child{break-after:auto;page-break-after:auto}
 }
+
+/* Brand logo image */
+.brand-logo-img{width:42px;height:42px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff}
