@@ -180,6 +180,70 @@ async function findReportByDate(targetDate) {
   }
 }
 
+// Helper: Parse a (multi-line) edit message into commands
+function cleanVal(v) {
+  return String(v || '')
+    .replace(/^[\s=]+/, '')            // leading "===" / "="
+    .replace(/[\s=]+$/, '')
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '') // surrounding quotes
+    .trim();
+}
+
+const EDIT_KEYS = {
+  client: 'c',
+  site: 's', sitecode: 's',
+  category: 'cat', cat: 'cat',
+  details: 'w', activitydetails: 'w', detail: 'w', work: 'w',
+  assignedby: 'ab',
+  teamperson: 't', team: 't',
+  from: 'from', start: 'from', starttime: 'from',
+  to: 'to', end: 'to', endtime: 'to'
+};
+
+function parseEditMessage(text) {
+  const result = { from: null, to: null, commit: false, remove: [], blocks: [], unknown: [] };
+  let cur = null;
+  const lines = text.replace(/\r/g, '').split('\n');
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    if (/^\/?commit$/i.test(line)) { result.commit = true; continue; }
+
+    let m;
+    if ((m = line.match(/^(?:remove|delete)\s*(?:activity)?\s*(\d+)$/i))) {
+      result.remove.push(parseInt(m[1], 10));
+      continue;
+    }
+
+    if ((m = line.match(/^activity\s*(\d+)\s*:?\s*$/i))) {
+      cur = { n: parseInt(m[1], 10), f: {} };
+      result.blocks.push(cur);
+      continue;
+    }
+
+    const idx = line.indexOf(':');
+    if (idx === -1) { result.unknown.push(line); continue; }
+
+    const key = line.slice(0, idx).toLowerCase().replace(/[^a-z]/g, '');
+    const val = cleanVal(line.slice(idx + 1));
+    const field = EDIT_KEYS[key];
+    if (!field) { result.unknown.push(line); continue; }
+
+    if (field === 'from') { result.from = val; continue; }
+    if (field === 'to') { result.to = val; continue; }
+
+    // New activity field. Start a new unnumbered block when "Client" repeats or none open.
+    if (!cur || (field === 'c' && cur.f.c !== undefined)) {
+      cur = { n: null, f: {} };
+      result.blocks.push(cur);
+    }
+    cur.f[field] = val;
+  }
+  return result;
+}
+
 // Telegram Message Listener with Chat-Level Concurrency Lock
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
@@ -242,77 +306,78 @@ bot.on('message', async (msg) => {
         editFrame.step = 'READY_TO_MODIFY';
         editFrame.reportKey = found.key;
         editFrame.report = found.data;
-        editFrame.newRows = []; // Start fresh array for new/updated rows
+        editFrame.rows = existingRows.map(r => ({ ...r })); // working copy (keeps old activities)
 
-        let summaryText = existingRows.map((r, i) => `*Activity ${i + 1}:*\nClient: ${mdEsc(r.c)}\nSite: ${mdEsc(r.s)}\nCategory: ${mdEsc(r.cat)}\nDetails: ${mdEsc(r.w)}`).join('\n\n');
+        let summaryText = existingRows.map((r, i) => `*Activity ${i + 1}:*\nClient: ${mdEsc(r.c)}\nSite code: ${mdEsc(r.s)}\nCategory: ${mdEsc(r.cat)}\nActivity details: ${mdEsc(r.w)}\nAssigned by: ${mdEsc(r.ab)}\nTeam / person: ${mdEsc(r.t)}`).join('\n\n');
 
-        await bot.sendMessage(chatId, `✅ *Report Found!*\n\n📅 Date: ${mdEsc(found.data.date)}\n⏰ From: ${mdEsc(found.data.startTime)} | To: ${mdEsc(found.data.endTime)}\n\n--- *EXISTING ACTIVITIES* ---\n${summaryText || 'N/A'}\n\n---\n📌 *Actions available:*\n1. Notun activity add korte format (Client:, Site code:, etc.) fill-up kore pathan.\n2. Start Time change korte: \`from: 09:00\` likhun.\n3. End Time change korte: \`to: 18:00\` likhun.\n4. Shob seshe save korte **"commit"** likhun.`, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, `✅ *Report Found!*\n\n📅 Date: ${mdEsc(found.data.date)}\n⏰ From: ${mdEsc(found.data.startTime)} | To: ${mdEsc(found.data.endTime)}\n\n--- *EXISTING ACTIVITIES* ---\n${summaryText || 'N/A'}\n\n---\n📌 *Actions available:*\n1. Activity change korte \`Activity 1:\` diye format din (Client/Site/Category/Details). Notun add korte number chara ba notun number din. Delete: \`remove 2\`.\n2. Start Time change korte: \`from: 09:00\` likhun.\n3. End Time change korte: \`to: 18:00\` likhun.\n4. Shob ek message-e dewa jabe, shesh e \`commit\` likhun.`, { parse_mode: 'Markdown' });
         return;
       }
 
       if (editFrame.step === 'READY_TO_MODIFY') {
-        // Handle Time Update Commands in Edit Mode
-        if (lowerText.startsWith('from:')) {
-          const newTime = text.split(':').slice(1).join(':').trim();
-          editFrame.report.startTime = normalizeTime(newTime);
-          await bot.sendMessage(chatId, `✅ Start Time updated to: *${editFrame.report.startTime}*\nAro change korte format din ba **"commit"** likhun.`, { parse_mode: 'Markdown' });
-          return;
-        }
+        const cmd = parseEditMessage(text);
+        const log = [];
 
-        if (lowerText.startsWith('to:')) {
-          const newTime = text.split(':').slice(1).join(':').trim();
-          editFrame.report.endTime = normalizeTime(newTime);
-          await bot.sendMessage(chatId, `✅ End Time updated to: *${editFrame.report.endTime}*\nAro change korte format din ba **"commit"** likhun.`, { parse_mode: 'Markdown' });
-          return;
-        }
+        if (cmd.from) { editFrame.report.startTime = normalizeTime(cmd.from); log.push(`⏰ From → ${editFrame.report.startTime}`); }
+        if (cmd.to) { editFrame.report.endTime = normalizeTime(cmd.to); log.push(`⏱ To → ${editFrame.report.endTime}`); }
 
-        // Handle Activity Form Input
-        if (lowerText.includes('client:') || lowerText.includes('site code:')) {
-          const lines = text.split('\n');
-          const getVal = (prefix) => {
-            const line = lines.find(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
-            return line ? line.split(':').slice(1).join(':').trim() : '';
-          };
-
-          const rowObj = {
-            c: getVal('Client'),
-            s: getVal('Site code').toUpperCase(),
-            cat: getVal('Category') || 'Implementation',
-            w: getVal('Activity details'),
-            ab: getVal('Assigned by') || 'MD Azmir Hossain',
-            t: getVal('Team person') || 'N/A'
-          };
-
-          editFrame.newRows.push(rowObj);
-          await bot.sendMessage(chatId, `✅ Modified/New Activity Added (${editFrame.newRows.length})\nAro add korte format din, time change korte \`from: HH:MM\` / \`to: HH:MM\` likhun, ba save korte **"commit"** likhun.`);
-          return;
-        }
-
-        // Handle Commit / Save
-        if (lowerText === 'commit' || lowerText === '/commit') {
-          // If user didn't add new rows during edit, keep existing rows
-          if (!editFrame.newRows || editFrame.newRows.length === 0) {
-            editFrame.newRows = Array.isArray(editFrame.report.rows) ? editFrame.report.rows : Object.values(editFrame.report.rows || {});
-          }
-
-          let reportToUpdate = editFrame.report;
-          reportToUpdate.id = editFrame.reportKey;
-          reportToUpdate.rows = editFrame.newRows;
-          reportToUpdate.ot = calculateOT(reportToUpdate.startTime, reportToUpdate.endTime);
-
-          await bot.sendMessage(chatId, `⏳ Updating report in Firebase...`);
-          const saved = await saveToFirebase(reportToUpdate);
-
-          if (saved) {
-            delete editFrames[chatId];
-            await bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY COMMITTED & UPDATED!* 🚀\n\n📅 Date: ${reportToUpdate.date}\n⏰ From: ${reportToUpdate.startTime} | To: ${reportToUpdate.endTime}\n⌛ Total OT: ${reportToUpdate.ot}`, { parse_mode: 'Markdown' });
+        for (const blk of cmd.blocks) {
+          const f = blk.f;
+          if (Object.keys(f).length === 0) continue;
+          const existing = blk.n && editFrame.rows[blk.n - 1];
+          if (existing) {
+            // Update only the fields the user actually sent
+            if (f.c !== undefined && f.c !== '') existing.c = f.c;
+            if (f.s !== undefined && f.s !== '') existing.s = f.s.toUpperCase();
+            if (f.cat !== undefined && f.cat !== '') existing.cat = f.cat;
+            if (f.w !== undefined && f.w !== '') existing.w = f.w;
+            if (f.ab !== undefined && f.ab !== '') existing.ab = f.ab;
+            if (f.t !== undefined && f.t !== '') existing.t = f.t;
+            log.push(`✏️ Activity ${blk.n} updated`);
           } else {
-            await bot.sendMessage(chatId, `❌ Update failed! Please try again.`);
+            editFrame.rows.push({
+              c: f.c || '',
+              s: (f.s || '').toUpperCase(),
+              cat: f.cat || 'Implementation',
+              w: f.w || '',
+              ab: f.ab || 'MD Azmir Hossain',
+              t: f.t || 'N/A'
+            });
+            log.push(`➕ Activity ${editFrame.rows.length} added`);
+          }
+        }
+
+        // Remove (highest index first so numbering doesn't shift)
+        for (const n of [...new Set(cmd.remove)].sort((a, b) => b - a)) {
+          if (editFrame.rows[n - 1]) { editFrame.rows.splice(n - 1, 1); log.push(`🗑 Activity ${n} removed`); }
+        }
+
+        if (!cmd.commit) {
+          if (log.length === 0) {
+            await bot.sendMessage(chatId, `💡 Format bujhte parini.\n\nExample:\nActivity 1:\nClient: SCOMM\nSite code: OFFICE DUTY\nCategory: IMP Excel Input\nActivity details: your text\nAssigned by: Md Azmir Hossain\nTeam / person: N/A\nfrom: 11:50\nto: 18:00\ncommit\n\nBa bondho korte /cancel likhun.`);
+          } else {
+            const unk = cmd.unknown.length ? `\n\n⚠️ Ignored: ${cmd.unknown.join(' | ')}` : '';
+            await bot.sendMessage(chatId, `${log.join('\n')}${unk}\n\nAro change korun, ba save korte "commit" likhun.`);
           }
           return;
         }
 
-        await bot.sendMessage(chatId, `💡 Format fill-up kore pathan, time change korte \`from: 09:00\` / \`to: 18:00\` likhun, save korte **"commit"** likhun, ba bondho korte /cancel likhun.`);
+        // Commit / Save
+        const reportToUpdate = editFrame.report;
+        reportToUpdate.id = editFrame.reportKey;
+        reportToUpdate.rows = editFrame.rows;
+        reportToUpdate.ot = calculateOT(reportToUpdate.startTime, reportToUpdate.endTime);
+
+        await bot.sendMessage(chatId, `${log.length ? log.join('\n') + '\n\n' : ''}⏳ Updating report in Firebase...`);
+        const saved = await saveToFirebase(reportToUpdate);
+
+        if (saved) {
+          delete editFrames[chatId];
+          const summary = reportToUpdate.rows.map((r, i) => `Activity ${i + 1}:\nClient: ${r.c}\nSite code: ${r.s}\nCategory: ${r.cat}\nActivity details: ${r.w}\nAssigned by: ${r.ab}\nTeam / person: ${r.t}`).join('\n\n');
+          await bot.sendMessage(chatId, `✅ REPORT SUCCESSFULLY COMMITTED & UPDATED! 🚀\n\n📅 Date: ${reportToUpdate.date}\n⏰ From: ${reportToUpdate.startTime}\n⏱ To: ${reportToUpdate.endTime}\n⌛ Total OT: ${reportToUpdate.ot}\n\n--- SUMMARY ---\n${summary}`);
+        } else {
+          await bot.sendMessage(chatId, `❌ Update failed! Please try again.`);
+        }
         return;
       }
       return;
@@ -357,13 +422,13 @@ bot.on('message', async (msg) => {
       frame.startTime = normalizeTime(text);
       frame.step = 'READY_FOR_ACTIVITY';
 
-      await bot.sendMessage(chatId, `✅ *Start Time Set: ${frame.startTime}*\n\nAro activity jog korte template puron kore pathan ba *"add"* command din.\n\n*Activity Format:*\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
+      await bot.sendMessage(chatId, `✅ *Start Time Set: ${frame.startTime}*\n\nAro activity jog korte template puron kore pathan ba *"add"* command din.\n\n*Activity Format:*\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam / person: `, { parse_mode: 'Markdown' });
       return;
     }
 
     // 7. ADD NEW ACTIVITY LOG FRAME
     if (lowerText === 'add') {
-      await bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*\n\nPura structure copy kore fill-up kore pathan:\n\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
+      await bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*\n\nPura structure copy kore fill-up kore pathan:\n\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam / person: `, { parse_mode: 'Markdown' });
       return;
     }
 
@@ -381,7 +446,7 @@ bot.on('message', async (msg) => {
         cat: getVal('Category') || 'Implementation',
         w: getVal('Activity details'),
         ab: getVal('Assigned by') || 'MD Azmir Hossain',
-        t: getVal('Team person') || 'N/A'
+        t: (getVal('Team / person') || getVal('Team person') || getVal('Team')) || 'N/A'
       };
 
       frame.rows.push(rowObj);
@@ -427,7 +492,7 @@ bot.on('message', async (msg) => {
 
       if (saved) {
         delete activeFrames[chatId];
-        let summaryText = finalReport.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
+        let summaryText = finalReport.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite code: ${r.s}\nCategory: ${r.cat}\nActivity details: ${r.w}\nAssigned by: ${r.ab}\nTeam / person: ${r.t}`).join('\n\n');
 
         await bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY SUBMITTED!*\n\n📅 *Date:* ${finalReport.date}\n⏰ *From:* ${finalReport.startTime}\n⏱ *To:* ${finalReport.endTime}\n⌛ *Total OT:* ${finalReport.ot}\n\n--- *SUMMARY* ---\n${summaryText}`, { parse_mode: 'Markdown' });
       } else {
