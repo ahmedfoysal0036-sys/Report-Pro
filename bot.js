@@ -47,10 +47,11 @@ app.post(`/bot${TOKEN}`, (req, res) => {
 
 // Cache processed message IDs & Active Chat Locks
 const processedMsgIds = new Set();
-const processingChats = new Set(); // Prevents overlapping async triggers
+const processingChats = new Set();
 
-// Active user report frames
+// Active user report & edit frames
 const activeFrames = {};
+const editFrames = {};
 
 // Helper: Today date string (YYYY-MM-DD)
 const todayStr = () => {
@@ -97,12 +98,12 @@ function calculateOT(startTime, endTime) {
   return `${mm} mins`;
 }
 
-// Firebase REST API Push
+// Firebase REST API Push/Update
 async function saveToFirebase(reportData) {
   const id = reportData.id || (Date.now().toString() + Math.floor(100 + Math.random() * 900));
   reportData.id = id;
   reportData.updatedAt = Date.now();
-  reportData.schemaVersion = 3;
+  reportData.schemaVersion = 4;
 
   const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports/${id}.json`;
   try {
@@ -118,17 +119,32 @@ async function saveToFirebase(reportData) {
   }
 }
 
+// Fetch report by date from Firebase
+async function findReportByDate(targetDate) {
+  const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports.json`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data) return null;
+
+    const reportKey = Object.keys(data).find(key => data[key].date === targetDate);
+    return reportKey ? { key: reportKey, data: data[reportKey] } : null;
+  } catch (err) {
+    console.error('❌ Firebase Fetch Error:', err);
+    return null;
+  }
+}
+
 // Telegram Message Listener with Chat-Level Concurrency Lock
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const msgId = msg.message_id;
 
-  // Prevent duplicate message processing
   if (processedMsgIds.has(msgId)) return;
   processedMsgIds.add(msgId);
   if (processedMsgIds.size > 200) processedMsgIds.clear();
 
-  // Prevent overlapping execution for the same chat
   if (processingChats.has(chatId)) return;
   processingChats.add(chatId);
 
@@ -137,6 +153,85 @@ bot.on('message', async (msg) => {
     if (!text) return;
 
     const lowerText = text.toLowerCase();
+
+    // ==================== EDIT REPORT FLOW ====================
+    if (lowerText === '/edit' || lowerText === 'edit') {
+      editFrames[chatId] = { step: 'WAITING_FOR_EDIT_DATE' };
+      await bot.sendMessage(chatId, `✏️ *EDIT REPORT MODE*\n\nJe tarikh er report edit korte chan, sei tarikh ti din (e.g., \`${todayStr()}\`):`, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    let editFrame = editFrames[chatId];
+    if (editFrame && editFrame.step === 'WAITING_FOR_EDIT_DATE') {
+      const targetDate = text;
+      await bot.sendMessage(chatId, `⏳ Searching report for date: *${targetDate}*...`, { parse_mode: 'Markdown' });
+      
+      const found = await findReportByDate(targetDate);
+      if (!found) {
+        delete editFrames[chatId];
+        await bot.sendMessage(chatId, `❌ Ei tarikh (\`${targetDate}\`) er kono report pawa jayni!`, { parse_mode: 'Markdown' });
+        return;
+      }
+
+      editFrames[chatId] = {
+        step: 'READY_TO_MODIFY',
+        reportKey: found.key,
+        report: found.data,
+        newRows: []
+      };
+
+      let summaryText = found.data.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
+
+      await bot.sendMessage(chatId, `✅ *Report Found!*\n\n📅 Date: ${found.data.date}\n⏰ From: ${found.data.startTime} | To: ${found.data.endTime}\n\n--- *EXISTING ACTIVITIES* ---\n${summaryText}\n\nNotun kore activities add ba change korte format fill-up kore pathan, ebong seshe **"commit"** likhun.`, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    if (editFrame && editFrame.step === 'READY_TO_MODIFY') {
+      if (lowerText.includes('client:') || lowerText.includes('site code:')) {
+        const lines = text.split('\n');
+        const getVal = (prefix) => {
+          const line = lines.find(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
+          return line ? line.split(':').slice(1).join(':').trim() : '';
+        };
+
+        const rowObj = {
+          c: getVal('Client'),
+          s: getVal('Site code').toUpperCase(),
+          cat: getVal('Category') || 'Implementation',
+          w: getVal('Activity details'),
+          ab: getVal('Assigned by') || 'MD Azmir Hossain',
+          t: getVal('Team person') || 'N/A'
+        };
+
+        editFrame.newRows.push(rowObj);
+        await bot.sendMessage(chatId, `✅ Modified Activity Added (${editFrame.newRows.length})\nAro add korte format din ba save korte **"commit"** likhun.`);
+        return;
+      }
+
+      if (lowerText === 'commit' || lowerText === '/commit') {
+        if (!editFrame.newRows || editFrame.newRows.length === 0) {
+          await bot.sendMessage(chatId, `⚠️ Kono notun/modified activity add kora hoyni!`);
+          return;
+        }
+
+        let reportToUpdate = editFrame.report;
+        reportToUpdate.id = editFrame.reportKey;
+        reportToUpdate.rows = editFrame.newRows;
+        reportToUpdate.ot = calculateOT(reportToUpdate.startTime, reportToUpdate.endTime);
+
+        await bot.sendMessage(chatId, `⏳ Updating report in Firebase...`);
+        const saved = await saveToFirebase(reportToUpdate);
+
+        if (saved) {
+          delete editFrames[chatId];
+          await bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY COMMITTED & UPDATED!* 🚀\n\n📅 Date: ${reportToUpdate.date}\n⌛ Total OT: ${reportToUpdate.ot}`, { parse_mode: 'Markdown' });
+        } else {
+          await bot.sendMessage(chatId, `❌ Update failed! Please try again.`);
+        }
+        return;
+      }
+    }
+    // ==========================================================
 
     // 1. START COMMAND
     if (lowerText === '/start' || lowerText === 'start') {
@@ -154,7 +249,7 @@ bot.on('message', async (msg) => {
 
     let frame = activeFrames[chatId];
     if (!frame) {
-      await bot.sendMessage(chatId, `💡 Direct frame-wise report shuru korte *"start"* likhun.`);
+      await bot.sendMessage(chatId, `💡 Direct frame-wise report shuru korte *"start"* likhun ba edit korte *"edit"* likhun.`);
       return;
     }
 
@@ -258,7 +353,6 @@ bot.on('message', async (msg) => {
   } catch (err) {
     console.error('❌ Bot Error:', err);
   } finally {
-    // Release the chat lock once processing is complete
     processingChats.delete(chatId);
   }
 });
