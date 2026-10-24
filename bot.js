@@ -119,26 +119,83 @@ async function saveToFirebase(reportData) {
   }
 }
 
-// Fetch report by date from Firebase with robust string matching
+// Escape text for Telegram legacy Markdown (prevents "can't parse entities" errors)
+const mdEsc = (v) => String(v === undefined || v === null || v === '' ? 'N/A' : v).replace(/([_*`\[])/g, '\\$1');
+
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+// Convert many date formats into "YYYY-MM-DD". Returns '' if not understood.
+function toISODate(input) {
+  if (input === undefined || input === null) return '';
+  // Bangla digits -> English digits
+  const s = String(input).trim().replace(/[০-৯]/g, d => '০১২৩৪৫৬৭৮৯'.indexOf(d));
+  if (!s) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  let m;
+
+  // 2026-10-24 | 2026/10/24 | 2026.10.24 (optionally followed by time)
+  if ((m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+
+  // 24-10-2026 | 24/10/2026 | 24.10.2026  (assumed DD-MM-YYYY)
+  if ((m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})/))) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+
+  // 24 Oct 2026 | 24-Oct-2026
+  if ((m = s.match(/^(\d{1,2})[\s-]+([A-Za-z]{3,})[\s,.-]+(\d{4})/))) {
+    const mon = MONTHS[m[2].slice(0, 3).toLowerCase()];
+    if (mon) return `${m[3]}-${pad(mon)}-${pad(m[1])}`;
+  }
+
+  // Oct 24, 2026
+  if ((m = s.match(/^([A-Za-z]{3,})\s+(\d{1,2}),?\s+(\d{4})/))) {
+    const mon = MONTHS[m[1].slice(0, 3).toLowerCase()];
+    if (mon) return `${m[3]}-${pad(mon)}-${pad(m[2])}`;
+  }
+  return '';
+}
+
+// Fetch report by date from Firebase.
+// Returns { match: {key, data} | null, dates: [recent stored dates], error: string | null }
 async function findReportByDate(targetDate) {
   const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports.json`;
   try {
     const response = await fetch(url);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.error(`❌ Firebase read failed: HTTP ${response.status} ${body}`);
+      return { match: null, dates: [], error: `Firebase theke data read kora jachchhe na (HTTP ${response.status}). Database rules check korun.` };
+    }
+
     const data = await response.json();
-    if (!data) return null;
+    if (!data) return { match: null, dates: [], error: null };
 
-    const cleanTarget = targetDate.trim();
-    const reportKey = Object.keys(data).find(key => {
-      const report = data[key];
-      if (!report || !report.date) return false;
-      return report.date.toString().trim() === cleanTarget;
-    });
+    // Firebase can return an object OR an array
+    const entries = Array.isArray(data)
+      ? data.map((v, i) => [String(i), v])
+      : Object.entries(data);
 
-    return reportKey ? { key: reportKey, data: data[reportKey] } : null;
+    const valid = entries.filter(([, r]) => r && typeof r === 'object' && r.date !== undefined && r.date !== null);
+
+    const clean = String(targetDate).trim();
+    const targetIso = toISODate(clean);
+
+    // 1) exact string match, 2) match after normalizing date formats
+    let matches = valid.filter(([, r]) => String(r.date).trim() === clean);
+    if (matches.length === 0 && targetIso) {
+      matches = valid.filter(([, r]) => toISODate(r.date) === targetIso);
+    }
+
+    const recentDates = valid.slice(-10).map(([, r]) => String(r.date).trim());
+    console.log(`🔎 Edit search | input="${clean}" iso="${targetIso}" | total=${entries.length} valid=${valid.length} | recent dates:`, recentDates);
+
+    if (matches.length === 0) return { match: null, dates: recentDates, error: null };
+
+    // If multiple reports share the same date, take the most recently updated one
+    matches.sort((a, b) => (b[1].updatedAt || 0) - (a[1].updatedAt || 0));
+    const [key, report] = matches[0];
+    return { match: { key, data: report }, dates: recentDates, error: null };
   } catch (err) {
     console.error('❌ Firebase Fetch Error:', err);
-    return null;
+    return { match: null, dates: [], error: `Firebase connection error: ${err.message}` };
   }
 }
 
@@ -182,23 +239,34 @@ bot.on('message', async (msg) => {
 
       if (editFrame.step === 'WAITING_FOR_EDIT_DATE') {
         const targetDate = text;
-        await bot.sendMessage(chatId, `⏳ Searching report for date: *${targetDate}*...`, { parse_mode: 'Markdown' });
-        
-        const found = await findReportByDate(targetDate);
-        if (!found) {
+        await bot.sendMessage(chatId, `⏳ Searching report for date: ${targetDate} ...`);
+
+        const { match, dates, error } = await findReportByDate(targetDate);
+
+        if (error) {
           delete editFrames[chatId];
-          await bot.sendMessage(chatId, `❌ Ei tarikh (\`${targetDate}\`) er kono report pawa jayni!`, { parse_mode: 'Markdown' });
+          await bot.sendMessage(chatId, `❌ ${error}`);
           return;
         }
+
+        if (!match) {
+          // Keep edit mode open so user can retry without typing /edit again
+          const list = dates.length ? dates.map(d => `• ${d}`).join('\n') : '(Firebase e kono report nai)';
+          await bot.sendMessage(chatId, `❌ "${targetDate}" tarikh er kono report pawa jayni.\n\nFirebase e ei date gulo ache:\n${list}\n\nUporer moto exact format e date din, ba /cancel likhun.`);
+          return;
+        }
+
+        const found = match;
+        const existingRows = Array.isArray(found.data.rows) ? found.data.rows : Object.values(found.data.rows || {});
 
         editFrame.step = 'READY_TO_MODIFY';
         editFrame.reportKey = found.key;
         editFrame.report = found.data;
         editFrame.newRows = []; // Fresh array for updated activities
 
-        let summaryText = found.data.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
+        const summaryText = existingRows.map((r, i) => `*Activity ${i + 1}:*\nClient: ${mdEsc(r.c)}\nSite: ${mdEsc(r.s)}\nCategory: ${mdEsc(r.cat)}\nDetails: ${mdEsc(r.w)}`).join('\n\n');
 
-        await bot.sendMessage(chatId, `✅ *Report Found!*\n\n📅 Date: ${found.data.date}\n⏰ From: ${found.data.startTime} | To: ${found.data.endTime}\n\n--- *EXISTING ACTIVITIES* ---\n${summaryText}\n\nNotun kore activities add ba change korte format fill-up kore pathan, ebong seshe **"commit"** likhun.`, { parse_mode: 'Markdown' });
+        await bot.sendMessage(chatId, `✅ *Report Found!*\n\n📅 Date: ${mdEsc(found.data.date)}\n⏰ From: ${mdEsc(found.data.startTime)} | To: ${mdEsc(found.data.endTime)}\n\n--- *EXISTING ACTIVITIES* ---\n${summaryText || 'N/A'}\n\nNotun kore activities add ba change korte format fill-up kore pathan, ebong seshe *"commit"* likhun.`, { parse_mode: 'Markdown' });
         return;
       }
 
@@ -246,6 +314,9 @@ bot.on('message', async (msg) => {
           }
           return;
         }
+      }
+      if (editFrame.step === 'READY_TO_MODIFY') {
+        await bot.sendMessage(chatId, `💡 Format fill-up kore pathan (Client: / Site code: ...), save korte "commit" likhun, ba bondho korte /cancel likhun.`);
       }
       return; // Stop further processing if inside edit flow
     }
