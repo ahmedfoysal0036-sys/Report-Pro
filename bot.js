@@ -1,4 +1,3 @@
-[file-tag: bot.js]
 const express = require('express');
 const TelegramBotLib = require('node-telegram-bot-api');
 
