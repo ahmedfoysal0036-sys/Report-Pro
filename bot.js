@@ -59,6 +59,9 @@ bot.on('polling_error', (error) => {
   }
 });
 
+// Cache processed message IDs to prevent duplicate execution
+const processedMsgIds = new Set();
+
 // Active user report frames
 const activeFrames = {};
 
@@ -131,6 +134,19 @@ async function saveToFirebase(reportData) {
 // Telegram Message Listener
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
+  const msgId = msg.message_id;
+
+  // Prevent processing the same message ID twice
+  if (processedMsgIds.has(msgId)) {
+    return;
+  }
+  processedMsgIds.add(msgId);
+
+  // Clear memory cache every 5 minutes
+  if (processedMsgIds.size > 200) {
+    processedMsgIds.clear();
+  }
+
   const text = (msg.text || '').trim();
   if (!text) return;
 
