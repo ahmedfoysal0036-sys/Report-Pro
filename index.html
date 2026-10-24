@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Activity Tracker · Dhanmondi SC</title>
-<!-- External Libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -12,38 +11,57 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<!-- Custom Stylesheet -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- ── Auth gate ─────────────────────────────────────── -->
 <section id="authGate" class="auth-wrap">
   <div class="auth-card">
-    <div class="brand" style="margin-bottom:18px"><div class="logo">D</div><div>Activity Tracker<small>Dhanmondi SC secure access</small></div></div>
-    <h1>Sign in</h1><p>Use an authorized Dhanmondi SC work account.</p>
+    <div class="brand" style="margin-bottom:18px">
+      <div class="logo">D</div>
+      <div>Activity Tracker<small>Dhanmondi SC secure access</small></div>
+    </div>
+    <h1>Sign in</h1>
+    <p>Use an authorised Dhanmondi SC work account.</p>
     <form id="loginForm">
       <div class="field"><label for="loginEmail">Work email</label><input id="loginEmail" type="email" autocomplete="username" required></div>
       <div class="field"><label for="loginPassword">Password</label><input id="loginPassword" type="password" autocomplete="current-password" required></div>
-      <div class="auth-actions"><button class="btn btn-primary" type="submit" id="loginBtn">Sign in</button><button class="btn" type="button" id="resetPasswordBtn">Reset password</button></div>
+      <div class="auth-actions">
+        <button class="btn btn-primary" type="submit" id="loginBtn">Sign in</button>
+        <button class="btn" type="button" id="resetPasswordBtn">Reset password</button>
+      </div>
       <div id="authError" class="auth-error" role="alert"></div>
     </form>
-    <div class="auth-note">No public sign-up is provided. An administrator must create accounts in Firebase Authentication.</div>
+    <div class="auth-note">No public sign-up. An administrator must create accounts in Firebase Authentication.</div>
   </div>
 </section>
+
+<!-- ── Main app ───────────────────────────────────────── -->
 <div id="app" hidden>
+
+  <!-- Top bar -->
   <header class="topbar">
     <div class="topbar-in">
-      <div class="brand"><div class="logo">D</div><div>Activity Tracker<small>Dhanmondi SC daily report</small></div></div>
+      <div class="brand">
+        <div class="logo">D</div>
+        <div>Activity Tracker<small>Dhanmondi SC</small></div>
+      </div>
+
+      <!-- Desktop tabs -->
       <nav class="tabs" role="tablist" aria-label="Sections">
         <button role="tab" data-act="tab" data-tab="dashboard" aria-selected="false">Dashboard</button>
-        <button role="tab" data-act="tab" data-tab="report" aria-selected="true">Report</button>
-        <button role="tab" data-act="tab" data-tab="history" aria-selected="false">History</button>
+        <button role="tab" data-act="tab" data-tab="report"    aria-selected="true">Report</button>
+        <button role="tab" data-act="tab" data-tab="history"   aria-selected="false">History</button>
         <button role="tab" data-act="tab" data-tab="analytics" aria-selected="false">Analytics</button>
       </nav>
+
       <div class="spacer"></div>
       <span id="syncPill" class="pill">Connecting</span>
       <span id="currentUser" class="user-email" title="Signed-in account"></span>
       <button class="btn btn-sm" id="signOutBtn" type="button">Sign out</button>
+
       <details class="menu" id="menu">
         <summary class="btn">Export &amp; backup ▾</summary>
         <div class="menu-pop">
@@ -57,30 +75,52 @@
           <button data-act="sync">Sync from cloud now</button>
         </div>
       </details>
+
       <button class="btn btn-icon" id="themeBtn" data-act="theme" aria-label="Switch theme">☾</button>
     </div>
   </header>
 
+  <!-- Main content -->
   <main class="container">
+
     <!-- DASHBOARD -->
     <section id="view-dashboard" class="stack" hidden>
       <div class="card stack">
-        <div class="toolbar"><h2 class="card-title">Dhanmondi SC Dashboard</h2><div class="spacer"></div><div class="field" style="width:140px"><label for="dashYear">Year</label><select id="dashYear" aria-label="Dashboard year"></select></div></div>
+        <div class="toolbar">
+          <h2 class="card-title">Dhanmondi SC Dashboard</h2>
+          <div class="spacer"></div>
+          <div class="field" style="width:140px">
+            <label for="dashYear">Year</label>
+            <select id="dashYear" aria-label="Dashboard year"></select>
+          </div>
+        </div>
         <div class="stats" id="dashboardStats"></div>
       </div>
-      <div class="card stack"><h2 class="card-title">Monthly overtime</h2><div class="bars" id="dashboardBars" role="img" aria-label="Monthly overtime overview"></div></div>
-      <div class="card stack"><h2 class="card-title">Recent reports</h2><div class="tbl-wrap"><table class="data"><thead><tr><th>Date</th><th>Shift</th><th>Activities</th><th>OT</th></tr></thead><tbody id="dashboardRecent"></tbody></table></div></div>
+      <div class="card stack">
+        <h2 class="card-title">Monthly overtime</h2>
+        <div class="bars" id="dashboardBars" role="img" aria-label="Monthly overtime overview"></div>
+      </div>
+      <div class="card stack">
+        <h2 class="card-title">Recent reports</h2>
+        <div class="tbl-wrap">
+          <table class="data">
+            <thead><tr><th>Date</th><th>Shift</th><th>Activities</th><th>OT</th></tr></thead>
+            <tbody id="dashboardRecent"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
+
     <!-- REPORT -->
     <section id="view-report" class="stack">
       <div class="card toolbar">
-        <button class="btn btn-icon" data-act="prev" aria-label="Previous report" title="Previous report">‹</button>
-        <button class="btn btn-icon" data-act="next" aria-label="Next report" title="Next report">›</button>
+        <button class="btn btn-icon" data-act="prev" title="Previous report">‹</button>
+        <button class="btn btn-icon" data-act="next" title="Next report">›</button>
         <div class="field"><input type="date" id="gotoDate" aria-label="Go to date" title="Go to a saved report by date"></div>
         <span id="dirtyChip" class="chip" hidden>Unsaved changes</span>
         <div class="spacer"></div>
         <button class="btn" data-act="new">New report</button>
-        <button class="btn" data-act="copy-last">Copy last activities</button>
+        <button class="btn" data-act="copy-last">Copy last</button>
         <button class="btn btn-primary" data-act="save" title="Ctrl + S">Save report</button>
       </div>
 
@@ -125,7 +165,6 @@
             </div>
           </div>
         </div>
-
         <div id="entries" class="stack"></div>
         <button class="btn" data-act="add-row" style="width:100%">+ Add activity</button>
       </div>
@@ -138,7 +177,14 @@
         <div class="grid g4">
           <div class="field"><label for="hSearch">Search</label><input id="hSearch" type="search" placeholder="Site, client, activity…"></div>
           <div class="field"><label for="hShift">Shift</label>
-            <select id="hShift"><option value="all">All shifts</option><option value="day">Day</option><option value="night">Night</option><option value="leave">Leave</option><option value="off">Off / holiday</option></select></div>
+            <select id="hShift">
+              <option value="all">All shifts</option>
+              <option value="day">Day</option>
+              <option value="night">Night</option>
+              <option value="leave">Leave</option>
+              <option value="off">Off / holiday</option>
+            </select>
+          </div>
           <div class="field"><label for="dateFrom">From</label><input type="date" id="dateFrom"></div>
           <div class="field"><label for="dateTo">To</label><input type="date" id="dateTo"></div>
         </div>
@@ -170,11 +216,46 @@
         <div class="bars" id="bars" role="img" aria-label="Overtime hours per month"></div>
       </div>
       <div class="card tbl-wrap">
-        <table class="data"><thead><tr><th>Month</th><th>Day</th><th>Night</th><th>Leave</th><th>Off</th><th>Overtime</th></tr></thead><tbody id="monthRows"></tbody></table>
+        <table class="data">
+          <thead><tr><th>Month</th><th>Day</th><th>Night</th><th>Leave</th><th>Off</th><th>Overtime</th></tr></thead>
+          <tbody id="monthRows"></tbody>
+        </table>
       </div>
     </section>
+
   </main>
-</div>
+
+  <!-- Mobile bottom nav -->
+  <nav class="bottom-nav" aria-label="Mobile navigation">
+    <div class="bottom-nav-inner">
+      <button class="bnav-btn" data-act="tab" data-tab="dashboard" aria-selected="true">
+        <span class="bnav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </span>
+        Dashboard
+      </button>
+      <button class="bnav-btn" data-act="tab" data-tab="report" aria-selected="false">
+        <span class="bnav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </span>
+        Report
+      </button>
+      <button class="bnav-btn" data-act="tab" data-tab="history" aria-selected="false">
+        <span class="bnav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+        </span>
+        History
+      </button>
+      <button class="bnav-btn" data-act="tab" data-tab="analytics" aria-selected="false">
+        <span class="bnav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </span>
+        Analytics
+      </button>
+    </div>
+  </nav>
+
+</div><!-- /#app -->
 
 <div id="printRoot"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
@@ -186,7 +267,6 @@
 <datalist id="dl-team"></datalist>
 <datalist id="dl-site"></datalist>
 
-<!-- Custom App Logic Script -->
 <script src="app.js"></script>
 </body>
 </html>
