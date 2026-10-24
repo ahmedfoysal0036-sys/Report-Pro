@@ -2,7 +2,7 @@
 'use strict';
 
 /* ---------- Config ---------- */
-const DB_KEY='prof_stable_v30_ot_hm';          // same key as the old version, so existing data loads
+const DB_KEY='prof_stable_v30_ot_hm';
 const DRAFT_KEY='activity_draft_v1';
 const DEFAULTS={assigned:'Md Azmir Hossain',name:'S.M.Faisal Ahmed',hr:'0036',desig:'Sr Supervisor'};
 const DUTY_MINUTES=540;
@@ -22,7 +22,7 @@ const store={
   set(k,v){try{localStorage.setItem(k,v)}catch(e){}},
   del(k){try{localStorage.removeItem(k)}catch(e){}}
 };
-const parseJSON=(s,fallback)=>{try{const v=JSON.parse(s);return v==null?fallback:v}catch(e){return fallback}};
+const parseJSON=(s,fb)=>{try{const v=JSON.parse(s);return v==null?fb:v}catch(e){return fb}};
 const todayStr=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*60000).toISOString().split('T')[0]};
 const newId=()=>Date.now().toString()+Math.floor(100+Math.random()*900);
 const byDate=(a,b)=>(a.date||'').localeCompare(b.date||'')||String(a.id).localeCompare(String(b.id));
@@ -30,17 +30,32 @@ const label=s=>s==='Goverment Holiday'?'Government holiday':s;
 const isOffShift=s=>s!=='DAY'&&s!=='NIGHT'&&(OFF_TYPES.includes(s)||/leave|holiday|off/i.test(s||''));
 function shiftKind(s){
   s=s||'DAY';
-  if(s==='DAY')return 'day'; if(s==='NIGHT')return 'night';
+  if(s==='DAY')return 'day';if(s==='NIGHT')return 'night';
   if(/leave/i.test(s))return 'leave';
   if(isOffShift(s))return 'off';
   return 'day';
 }
 const rowFilled=r=>!!(r&&(r.c||r.s||r.cat||r.w||r.ab||r.t));
-function fmtOT(m){const h=Math.floor(m/60),mm=m%60;if(h&&mm)return `${h} hrs ${mm} mins`;if(h)return `${h} hrs`;if(mm)return `${mm} mins`;return '0 hrs'}
+
+/* ---- OT formatting: always returns "X hrs Y mins" or sub-values, never raw minutes ---- */
+function fmtOT(m){
+  if(!m||m<=0)return '0 hrs';
+  const h=Math.floor(m/60),mm=m%60;
+  if(h&&mm)return `${h} hrs ${mm} mins`;
+  if(h)return `${h} hrs`;
+  return `${mm} mins`;
+}
+/* ---- OT color class based on hours ---- */
+function otClass(mins){
+  if(!mins||mins<=0)return 'ot-none';
+  if(mins<120)return 'ot-low';   // < 2 hrs
+  if(mins<300)return 'ot-mid';   // 2–5 hrs
+  return 'ot-high';               // > 5 hrs
+}
 function parseOT(str){
   if(!str)return 0;let t=0;
   const h=String(str).match(/(\d+)\s*hrs?/i),m=String(str).match(/(\d+)\s*mins?/i);
-  if(h)t+=parseInt(h[1],10)*60; if(m)t+=parseInt(m[1],10);
+  if(h)t+=parseInt(h[1],10)*60;if(m)t+=parseInt(m[1],10);
   return t;
 }
 function normalize(r){
@@ -61,8 +76,7 @@ const persistLocal=()=>store.set(DB_KEY,JSON.stringify(DB));
 const readPending=()=>parseJSON(store.get(PENDING_KEY),{});
 const writePending=q=>store.set(PENDING_KEY,JSON.stringify(q));
 
-/* ---------- Firebase config and authentication ---------- */
-/* Copy these values from Firebase Console > Project settings > Your apps. */
+/* ---------- Firebase ---------- */
 const firebaseConfig={
   apiKey:'AIzaSyDX6cB4VW7xy33wvkYNOqntKNx76l3iJTg',
   authDomain:'infinite-v1.firebaseapp.com',
@@ -70,8 +84,7 @@ const firebaseConfig={
   projectId:'infinite-v1',
   storageBucket:'infinite-v1.firebasestorage.app',
   messagingSenderId:'651727705210',
-  appId:'1:651727705210:web:b5c15ca6642af300cb97c3',
-  measurementId:'G-YZFZCDY2Z9'
+  appId:'1:651727705210:web:b5c15ca6642af300cb97c3'
 };
 const firebaseConfigReady=()=>!Object.values(firebaseConfig).some(v=>String(v).includes('REPLACE_WITH'));
 let dbRef=null, auth=null, firebaseReady=false;
@@ -81,8 +94,9 @@ try{
     auth=firebase.auth();
     dbRef=firebase.database().ref('reports');
     firebaseReady=true;
-  }else console.warn('Firebase config needs to be completed before sign-in and cloud sync can work.');
+  }
 }catch(e){console.warn('Firebase unavailable',e)}
+
 function setSync(state){
   const p=$('syncPill');if(!p)return;
   p.className='pill '+state;
@@ -93,11 +107,10 @@ function cloneNormalized(r){return normalize(JSON.parse(JSON.stringify(r)))}
 function rowsObject(rows){const o={};rows.forEach(r=>{if(r&&r.id)o[String(r.id)]=r});return o}
 function mergeInitialRows(localRows,cloudRows){
   const map=new Map();
-  // Cloud records are loaded first; local records take precedence for legacy records without timestamps.
   [...(cloudRows||[]),...(localRows||[])].filter(Boolean).forEach(r=>{
     const c=cloneNormalized(r),id=String(c.id||'');if(!id)return;
     const old=map.get(id);
-    if(!old || (Number(c.updatedAt)||0)>=(Number(old.updatedAt)||0))map.set(id,c);
+    if(!old||(Number(c.updatedAt)||0)>=(Number(old.updatedAt)||0))map.set(id,c);
   });
   return [...map.values()].sort(byDate);
 }
@@ -116,7 +129,6 @@ function applyCloud(val){
     firstCloudSnapshot=false;
     const localRows=parseJSON(store.get(DB_KEY),[]);
     if(!cloudRows.length&&localRows.length){
-      // Critical data-preservation guard: an empty cloud snapshot must not erase local reports.
       DB=localRows.filter(Boolean).map(normalize).sort(byDate);persistLocal();
       const q=readPending();DB.forEach(r=>{q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2}});writePending(q);
       flushPending().then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
@@ -129,10 +141,7 @@ function applyCloud(val){
     return;
   }
   const pending=readPending();
-  if(Object.keys(pending).length){
-    // Keep queued local edits/deletions; merge cloud updates without discarding local work.
-    DB=mergeInitialRows(DB,cloudRows);persistLocal();refreshData();setSync('pending');return;
-  }
+  if(Object.keys(pending).length){DB=mergeInitialRows(DB,cloudRows);persistLocal();refreshData();setSync('pending');return}
   DB=cloudRows.sort(byDate);persistLocal();refreshData();
 }
 function stopCloud(){
@@ -163,10 +172,34 @@ function setDirty(v){dirty=v;$('dirtyChip').hidden=!v}
 function confirmDiscard(){return !dirty||confirm('You have unsaved changes. Discard them?')}
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
 
+/* ---- Sticky header shadow on scroll ---- */
+window.addEventListener('scroll',()=>{
+  const tb=document.querySelector('.topbar');
+  if(tb)tb.classList.toggle('scrolled',window.scrollY>8);
+},{passive:true});
+
+/* ---- Liquid button ripple ---- */
+document.addEventListener('mousemove',e=>{
+  const btn=e.target.closest('.btn');
+  if(!btn)return;
+  const r=btn.getBoundingClientRect();
+  btn.style.setProperty('--rx',((e.clientX-r.left)/r.width*100)+'%');
+  btn.style.setProperty('--ry',((e.clientY-r.top)/r.height*100)+'%');
+});
+
+/* ---- Tab switching with page transition ---- */
 function showTab(t){
   tab=t;
-  ['dashboard','report','history','analytics'].forEach(n=>{$('view-'+n).hidden=n!==t});
+  ['dashboard','report','history','analytics'].forEach(n=>{
+    const el=$('view-'+n);if(!el)return;
+    const active=n===t;
+    el.hidden=!active;
+    if(active){el.classList.remove('view-section');void el.offsetWidth;el.classList.add('view-section')}
+  });
+  // Desktop tabs
   document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+  // Mobile bottom nav
+  document.querySelectorAll('.bnav-btn').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
   if(t==='dashboard')initDashboardYears();
   if(t==='history')renderHistory();
   if(t==='analytics')initYears();
@@ -177,6 +210,18 @@ function applyTheme(t){
   $('themeBtn').textContent=t==='dark'?'☀':'☾';
 }
 
+/* ---------- Skeleton loaders ---------- */
+function skeletonHistory(){
+  return Array(4).fill(0).map(()=>`
+    <div class="card" style="display:flex;gap:12px;align-items:center">
+      <div class="skeleton" style="width:18px;height:18px;border-radius:4px;flex-shrink:0"></div>
+      <div style="flex:1">
+        <div class="skeleton skel-line w-60"></div>
+        <div class="skeleton skel-line w-40" style="margin-bottom:0"></div>
+      </div>
+    </div>`).join('');
+}
+
 /* ---------- Report form ---------- */
 const CAT_HTML='<option value="">Choose a category</option>'+CATEGORIES.map(c=>`<option>${esc(c)}</option>`).join('');
 
@@ -184,6 +229,7 @@ function addRow(v,focus){
   v=v||{};
   if(document.querySelectorAll('.entry').length>=MAX_ROWS){toast(`Maximum ${MAX_ROWS} activities per report`,'warn');return}
   const el=document.createElement('section');el.className='card entry';
+  el.style.animation='pageIn .22s ease both';
   el.innerHTML=`
     <div class="entry-head"><span class="badge b-num">Activity</span>
       <button type="button" class="btn btn-ghost btn-sm" data-act="remove-row">Remove</button></div>
@@ -244,7 +290,7 @@ function calcOT(){
   if($('shiftOff').checked){$('otHours').value='0 hrs';return}
   const s=$('startTime').value,e=$('endTime').value;
   if(!s||!e){$('otHours').value='0 hrs';return}
-  const mins=v=>{const [h,m]=v.split(':').map(Number);return h*60+m};
+  const mins=v=>{const[h,m]=v.split(':').map(Number);return h*60+m};
   const start=mins(s);let end=mins(e);if(end<start)end+=1440;
   const duration=end-start;
   if(duration<=0||duration>1440){$('otHours').value='Check shift time';return}
@@ -266,8 +312,7 @@ function getFormData(){
     assigned:$('assignedBy').value.trim(),
     name:$('userName').value.trim(),
     desig:$('userDesig').value.trim(),
-    shift,
-    rows:readRows()
+    shift,rows:readRows()
   };
 }
 function resetFields(){
@@ -279,8 +324,7 @@ function resetFields(){
   applyShift('DAY');
 }
 function loadForm(d,min){
-  d=normalize(d);
-  resetFields();
+  d=normalize(d);resetFields();
   $('editingId').value=d.id||'';
   $('reportDate').value=d.date||todayStr();
   if(d.assigned)$('assignedBy').value=d.assigned;
@@ -291,16 +335,14 @@ function loadForm(d,min){
   if(!$('shiftOff').checked){
     if(d.startTime)$('startTime').value=d.startTime;
     if(d.endTime)$('endTime').value=d.endTime;
-    if(d.startTime&&d.endTime)calcOT(); else if(d.ot)$('otHours').value=d.ot;
+    if(d.startTime&&d.endTime)calcOT();else if(d.ot)$('otHours').value=d.ot;
   }
-  setRows(d.rows,min);
-  setDirty(false);
+  setRows(d.rows,min);setDirty(false);
 }
 function openRecord(r){loadForm(r);store.del(DRAFT_KEY);showTab('report')}
 function newEntry(force){
   if(!force&&!confirmDiscard())return;
-  store.del(DRAFT_KEY);
-  resetFields();setRows([],5);setDirty(false);showTab('report');
+  store.del(DRAFT_KEY);resetFields();setRows([],5);setDirty(false);showTab('report');
 }
 function scheduleDraft(){
   clearTimeout(draftTimer);
@@ -313,10 +355,7 @@ async function saveData(){
   if(!data.date){toast('Choose a report date first','warn');return}
   if($('otHours').value==='Check shift time'){toast('Please check the shift start/end time.','warn');return}
   const clash=DB.find(r=>r.date===data.date&&r.id!==data.id);
-  if(clash){
-    if(!confirm(`A report for ${data.date} already exists. Replace it with this one?`))return;
-    data.id=clash.id;
-  }
+  if(clash){if(!confirm(`A report for ${data.date} already exists. Replace it?`))return;data.id=clash.id}
   data.updatedAt=Date.now();data.updatedBy=currentUser?currentUser.uid:'local';data.schemaVersion=2;
   showLoader('Saving…');
   const i=DB.findIndex(r=>r.id===data.id);
@@ -324,19 +363,18 @@ async function saveData(){
   DB.sort(byDate);persistLocal();
   $('editingId').value=data.id;setDirty(false);store.del(DRAFT_KEY);
   const q=readPending();q[String(data.id)]=data;writePending(q);
-  if(!dbRef||!currentUser){hideLoader();setSync('offline');toast('Saved locally. Sign in and configure Firebase to sync.','warn');return}
+  if(!dbRef||!currentUser){hideLoader();setSync('offline');toast('Saved locally. Sign in to sync.','warn');return}
   try{await Promise.race([flushPending(),timeout(10000,'Cloud write timed out')]);toast('Report saved and synced','success')}
-  catch(e){setSync('pending');toast('Saved on this device. Cloud sync is pending; it will retry when connected.','warn')}
+  catch(e){setSync('pending');toast('Saved on this device. Cloud sync pending.','warn')}
   refreshData();hideLoader();
 }
 function deleteRecords(ids){
-  const recs=DB.filter(r=>ids.includes(r.id));
-  if(!recs.length)return;
+  const recs=DB.filter(r=>ids.includes(r.id));if(!recs.length)return;
   DB=DB.filter(r=>!ids.includes(r.id));persistLocal();
   ids.forEach(id=>selected.delete(id));
   if(ids.includes($('editingId').value))$('editingId').value='';
   const q=readPending();ids.forEach(id=>q[String(id)]=null);writePending(q);
-  if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error');toast('Deleted locally; cloud deletion is pending.','warn')});
+  if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error')});
   undoBuf=recs;refreshData();
   toast(`${recs.length} report${recs.length>1?'s':''} deleted`,'info',{label:'Undo',fn:undoDelete});
 }
@@ -355,8 +393,7 @@ function navigate(dir){
   const list=DB.filter(r=>r.id!==cur);
   const t=dir==='prev'?list.filter(r=>r.date<date).pop():list.find(r=>r.date>date);
   if(!t){toast(dir==='prev'?'No earlier report':'No later report','info');return}
-  if(!confirmDiscard())return;
-  openRecord(t);
+  if(!confirmDiscard())return;openRecord(t);
 }
 function copyLast(){
   const date=$('reportDate').value,cur=$('editingId').value;
@@ -374,29 +411,36 @@ function filtered(){
   return DB.filter(r=>{
     if(f&&r.date<f)return false;if(t&&r.date>t)return false;
     if(sh!=='all'&&shiftKind(r.shift)!==sh)return false;
-    if(q){
-      const hay=[r.date,r.shift,r.assigned,...(r.rows||[]).flatMap(x=>[x.c,x.s,x.cat,x.w,x.ab,x.t])].join(' ').toLowerCase();
-      if(!hay.includes(q))return false;
-    }
+    if(q){const hay=[r.date,r.shift,r.assigned,...(r.rows||[]).flatMap(x=>[x.c,x.s,x.cat,x.w,x.ab,x.t])].join(' ').toLowerCase();if(!hay.includes(q))return false}
     return true;
   }).sort((a,b)=>byDate(b,a));
 }
-function renderHistory(){
+function renderHistory(skeleton){
+  const box=$('historyList');
+  if(skeleton){box.innerHTML=skeletonHistory();return}
   const list=filtered(),f=$('dateFrom').value,t=$('dateTo').value;
   $('sCount').textContent=list.length;
   $('sOt').textContent=fmtOT(list.reduce((n,r)=>n+parseOT(r.ot),0));
   $('sRange').textContent=f&&t?`${f} to ${t}`:f?`From ${f}`:t?`Until ${t}`:'All dates';
-  const box=$('historyList');
-  if(!list.length){box.innerHTML='<div class="card empty">No reports match. Change the filters, or save a report to see it here.</div>';updateSelUI(list);return}
+  if(!list.length){
+    box.innerHTML=`<div class="card empty">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      <p>No reports match. Change the filters or save a report.</p></div>`;
+    updateSelUI(list);return;
+  }
   box.innerHTML=list.map(r=>{
     const sites=[...new Set((r.rows||[]).map(x=>x.s).filter(Boolean))];
     const n=(r.rows||[]).filter(rowFilled).length;
+    const otMins=parseOT(r.ot);
     return `<div class="rec">
       <input type="checkbox" class="chk" data-id="${esc(r.id)}" aria-label="Select report ${esc(r.date)}" ${selected.has(r.id)?'checked':''}>
       <div class="rec-body" data-act="edit" data-id="${esc(r.id)}">
-        <div class="rec-title"><span>${esc(r.date)}</span><span class="badge b-${shiftKind(r.shift)}">${esc(label(r.shift))}</span>
+        <div class="rec-title">
+          <span>${esc(r.date)}</span>
+          <span class="badge b-${shiftKind(r.shift)}">${esc(label(r.shift))}</span>
           <span class="muted" style="font-weight:500">${esc(r.startTime||'--')} to ${esc(r.endTime||'--')}</span>
-          <span style="color:var(--danger)">OT ${esc(r.ot||'0 hrs')}</span></div>
+          <span class="${otClass(otMins)}" style="font-weight:700">OT ${esc(r.ot||'0 hrs')}</span>
+        </div>
         <div class="rec-sub">${n} ${n===1?'activity':'activities'}${sites.length?' · '+esc(sites.slice(0,4).join(', ')):''} · SC head: ${esc(r.assigned)}</div>
       </div>
       <button class="btn btn-ghost btn-sm btn-danger" data-act="del" data-id="${esc(r.id)}">Delete</button>
@@ -416,25 +460,65 @@ function updateSelUI(list){
 
 /* ---------- Dashboard ---------- */
 function initDashboardYears(){
-  const years=new Set([String(new Date().getFullYear())]);DB.forEach(r=>{if(r.date)years.add(r.date.slice(0,4))});
+  const years=new Set([String(new Date().getFullYear())]);
+  DB.forEach(r=>{if(r.date)years.add(r.date.slice(0,4))});
   const list=[...years].sort().reverse(),select=$('dashYear'),old=select.value;
-  select.innerHTML=list.map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('');if(list.includes(old))select.value=old;renderDashboard();
+  select.innerHTML=list.map(y=>`<option value="${esc(y)}">${esc(y)}</option>`).join('');
+  if(list.includes(old))select.value=old;
+  renderDashboard();
 }
 function renderDashboard(){
   if(!$('dashboardStats'))return;
   const year=$('dashYear').value||String(new Date().getFullYear());
   const records=DB.filter(r=>r.date&&r.date.startsWith(year+'-'));
   const totalOT=records.reduce((n,r)=>n+parseOT(r.ot),0);
-  const day=records.filter(r=>shiftKind(r.shift)==='day').length,night=records.filter(r=>shiftKind(r.shift)==='night').length;
-  const leave=records.filter(r=>shiftKind(r.shift)==='leave').length,off=records.filter(r=>shiftKind(r.shift)==='off').length;
-  const duty=day+night,activities=records.reduce((n,r)=>n+(r.rows||[]).filter(rowFilled).length,0);
-  const cards=[[records.length,'Total reports'],[duty,'Duty days'],[fmtOT(totalOT),'Total overtime'],[duty?fmtOT(Math.round(totalOT/duty)):'0 hrs','Average OT / duty day'],[activities,'Activities recorded'],[`${day} / ${night}`,'Day / Night shifts'],[leave,'Leave days'],[off,'Off / holidays']];
-  $('dashboardStats').innerHTML=cards.map(([v,l])=>`<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
-  const monthly=MONTHS.map((name,i)=>{const prefix=`${year}-${String(i+1).padStart(2,'0')}`;const rows=records.filter(r=>r.date.startsWith(prefix));return{name,mins:rows.reduce((n,r)=>n+parseOT(r.ot),0)}});
+  const day=records.filter(r=>shiftKind(r.shift)==='day').length;
+  const night=records.filter(r=>shiftKind(r.shift)==='night').length;
+  const leave=records.filter(r=>shiftKind(r.shift)==='leave').length;
+  const off=records.filter(r=>shiftKind(r.shift)==='off').length;
+  const duty=day+night;
+  const activities=records.reduce((n,r)=>n+(r.rows||[]).filter(rowFilled).length,0);
+  const avgOT=duty?fmtOT(Math.round(totalOT/duty)):'0 hrs';
+  const cards=[
+    [records.length,'Total reports'],
+    [duty,'Duty days'],
+    [fmtOT(totalOT),'Total overtime'],
+    [avgOT,'Avg OT / duty day'],
+    [activities,'Activities recorded'],
+    [`${day} / ${night}`,'Day / Night shifts'],
+    [leave,'Leave days'],
+    [off,'Off / holidays']
+  ];
+  $('dashboardStats').innerHTML=cards.map(([v,l])=>`<div class="stat"><b>${esc(String(v))}</b><span>${esc(l)}</span></div>`).join('');
+
+  /* Dashboard bars */
+  const monthly=MONTHS.map((name,i)=>{
+    const prefix=`${year}-${String(i+1).padStart(2,'0')}`;
+    const rows=records.filter(r=>r.date.startsWith(prefix));
+    return{name,mins:rows.reduce((n,r)=>n+parseOT(r.ot),0)};
+  });
   const max=Math.max(60,...monthly.map(m=>m.mins));
-  $('dashboardBars').innerHTML=monthly.map(m=>`<div class="bar-col" title="${esc(m.name)}: ${esc(fmtOT(m.mins))}"><div class="bar-val">${m.mins?(m.mins/60).toFixed(1)+'h':''}</div><div class="bar" style="height:${Math.round(m.mins/max*170)}px"></div><div class="bar-lbl">${esc(m.name.slice(0,3))}</div></div>`).join('');
+  const curMonth=String(new Date().getMonth()+1).padStart(2,'0');
+  const curYear=String(new Date().getFullYear());
+  $('dashboardBars').innerHTML=monthly.map((m,i)=>{
+    const isCur=year===curYear&&String(i+1).padStart(2,'0')===curMonth;
+    return `<div class="bar-col" title="${esc(m.name)}: ${esc(fmtOT(m.mins))}">
+      <div class="bar-val">${m.mins?fmtOT(m.mins):''}</div>
+      <div class="bar${isCur?' bar-current':''}" style="height:${Math.round(m.mins/max*170)}px"></div>
+      <div class="bar-lbl">${esc(m.name.slice(0,3))}</div>
+    </div>`;
+  }).join('');
+
+  /* Recent table */
   const recent=[...records].sort((a,b)=>byDate(b,a)).slice(0,10);
-  $('dashboardRecent').innerHTML=recent.length?recent.map(r=>`<tr><td>${esc(r.date)}</td><td>${esc(label(r.shift||'DAY'))}</td><td>${(r.rows||[]).filter(rowFilled).length}</td><td>${esc(r.ot||'0 hrs')}</td></tr>`).join(''):'<tr><td colspan="4">No reports found</td></tr>';
+  $('dashboardRecent').innerHTML=recent.length
+    ?recent.map(r=>`<tr>
+        <td>${esc(r.date)}</td>
+        <td><span class="badge b-${shiftKind(r.shift)}">${esc(label(r.shift||'DAY'))}</span></td>
+        <td>${(r.rows||[]).filter(rowFilled).length}</td>
+        <td class="${otClass(parseOT(r.ot))}" style="font-weight:700">${esc(r.ot||'0 hrs')}</td>
+      </tr>`).join('')
+    :'<tr><td colspan="4" style="text-align:center;color:var(--muted)">No reports found</td></tr>';
 }
 
 /* ---------- Analytics ---------- */
@@ -457,15 +541,29 @@ function renderAnalytics(){
   });
   const tot=data.reduce((a,m)=>({mins:a.mins+m.mins,duty:a.duty+m.day+m.night,leave:a.leave+m.leave,off:a.off+m.off}),{mins:0,duty:0,leave:0,off:0});
   $('yearStats').innerHTML=[
-    [fmtOT(tot.mins),'Total overtime'],[tot.duty,'Duty days'],[tot.leave,'Leave days'],[tot.off,'Off and holidays'],
+    [fmtOT(tot.mins),'Total overtime'],
+    [tot.duty,'Duty days'],
+    [tot.leave,'Leave days'],
+    [tot.off,'Off and holidays'],
     [tot.duty?fmtOT(Math.round(tot.mins/tot.duty)):'0 hrs','Average per duty day']
-  ].map(([v,l])=>`<div class="stat"><b>${esc(v)}</b><span>${l}</span></div>`).join('');
+  ].map(([v,l])=>`<div class="stat"><b class="${typeof v==='string'&&v.includes('hrs')?otClass(parseOT(v)):''}">${esc(String(v))}</b><span>${l}</span></div>`).join('');
+
   const max=Math.max(...data.map(m=>m.mins),60);
-  $('bars').innerHTML=data.map(m=>`<div class="bar-col" title="${m.name}: ${esc(fmtOT(m.mins))}">
-    <div class="bar-val">${m.mins?(m.mins/60).toFixed(1)+'h':''}</div>
-    <div class="bar" style="height:${Math.round(m.mins/max*170)}px"></div>
-    <div class="bar-lbl">${m.name.slice(0,3)}</div></div>`).join('');
-  $('monthRows').innerHTML=data.map(m=>`<tr><td>${m.name}</td><td>${m.day}</td><td>${m.night}</td><td>${m.leave}</td><td>${m.off}</td><td><b>${esc(fmtOT(m.mins))}</b></td></tr>`).join('');
+  const curMonth=String(new Date().getMonth()+1).padStart(2,'0');
+  const curYear=String(new Date().getFullYear());
+  $('bars').innerHTML=data.map((m,i)=>{
+    const isCur=y===curYear&&String(i+1).padStart(2,'0')===curMonth;
+    return `<div class="bar-col" title="${m.name}: ${esc(fmtOT(m.mins))}">
+      <div class="bar-val">${m.mins?fmtOT(m.mins):''}</div>
+      <div class="bar${isCur?' bar-current':''}" style="height:${Math.round(m.mins/max*170)}px"></div>
+      <div class="bar-lbl">${m.name.slice(0,3)}</div>
+    </div>`;
+  }).join('');
+
+  $('monthRows').innerHTML=data.map(m=>`<tr>
+    <td>${m.name}</td><td>${m.day}</td><td>${m.night}</td><td>${m.leave}</td><td>${m.off}</td>
+    <td><b class="${otClass(m.mins)}">${esc(fmtOT(m.mins))}</b></td>
+  </tr>`).join('');
 }
 
 function refreshData(){
@@ -510,7 +608,7 @@ window.addEventListener('afterprint',()=>{$('printRoot').innerHTML=''});
 
 async function exportPDF(){
   const list=getTargets();if(!list)return;
-  if(!window.jspdf||!window.html2canvas){toast('PDF tools failed to load. Check your connection.','error');return}
+  if(!window.jspdf||!window.html2canvas){toast('PDF tools failed to load.','error');return}
   showLoader('Creating PDF…');
   const host=document.createElement('div');
   host.style.cssText='position:fixed;left:-10000px;top:0;background:#fff';
@@ -521,7 +619,7 @@ async function exportPDF(){
       host.innerHTML=reportHTML(list[i]);
       const canvas=await html2canvas(host.firstElementChild,{scale:2,backgroundColor:'#ffffff'});
       let w=297,h=canvas.height*297/canvas.width;
-      if(h>210){h=210;w=canvas.width*210/canvas.height}      // keep proportions, never squash
+      if(h>210){h=210;w=canvas.width*210/canvas.height}
       if(i>0)pdf.addPage();
       pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',(297-w)/2,0,w,h);
     }
@@ -539,11 +637,11 @@ function download(blob,name){
 }
 function exportExcel(){
   const list=getTargets();if(!list)return;
-  if(!window.XLSX){toast('Excel tools failed to load. Check your connection.','error');return}
+  if(!window.XLSX){toast('Excel tools failed to load.','error');return}
   const out=[XL_HEAD];let sl=1;
   list.forEach(d=>{
     const rows=normalize(d).rows.filter(rowFilled);
-    (rows.length?rows:[{}]).forEach(r=>{      // reports with no activities (leave, off days) still export one line
+    (rows.length?rows:[{}]).forEach(r=>{
       out.push([sl++,d.date,d.shift,d.startTime||'',d.endTime||'',d.ot||'',r.c||'',r.s||'',r.cat||'',r.w||'',r.ab||'',r.t||'',d.name||'',d.hr||'',d.assigned||'',d.desig||'']);
     });
   });
@@ -566,7 +664,7 @@ async function importRecords(list){
   list.forEach(raw=>{
     if(!raw||!raw.date)return;
     const r=normalize(JSON.parse(JSON.stringify(raw)));
-    const ex=DB.find(x=>x.date===r.date);                 // same date = update, never duplicate
+    const ex=DB.find(x=>x.date===r.date);
     let id=ex?ex.id:(r.id?String(r.id):'');
     if(!id||DB.some(x=>x.id===id&&x.date!==r.date))id=Date.now().toString()+(1000+seq++);
     r.id=id;
@@ -575,7 +673,7 @@ async function importRecords(list){
     updates[id]=r;n++;
   });
   DB.sort(byDate);persistLocal();refreshData();
-  if(dbRef&&n){try{await Promise.race([dbRef.update(updates),timeout(15000)])}catch(e){toast('Imported on this device. Cloud sync will finish when online.','warn')}}
+  if(dbRef&&n){try{await Promise.race([dbRef.update(updates),timeout(15000)])}catch(e){toast('Imported locally. Cloud sync pending.','warn')}}
   return n;
 }
 function recordsFromSheet(rows){
@@ -594,19 +692,15 @@ function recordsFromSheet(rows){
   return Object.values(grouped);
 }
 function handleRestore(e){
-  const file=e.target.files[0];e.target.value='';
-  if(!file)return;
+  const file=e.target.files[0];e.target.value='';if(!file)return;
   showLoader('Restoring…');
   const reader=new FileReader();
   const isJson=/\.json$/i.test(file.name);
   reader.onload=async ev=>{
     try{
       let list;
-      if(isJson){list=parseJSON(ev.target.result,null);if(!Array.isArray(list))throw new Error('This JSON file is not a backup from this app')}
-      else{
-        const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});
-        list=recordsFromSheet(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}));
-      }
+      if(isJson){list=parseJSON(ev.target.result,null);if(!Array.isArray(list))throw new Error('Invalid backup file')}
+      else{const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});list=recordsFromSheet(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}))}
       if(!list.length)throw new Error('No reports found in this file');
       const n=await importRecords(list);
       toast(`Restored ${n} report${n===1?'':'s'}`,'success');showTab('history');
@@ -626,18 +720,15 @@ async function syncNow(){
     if(!cloud.length&&local.length){const q=readPending();local.forEach(r=>q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2});writePending(q);await flushPending()}
     else{DB=mergeInitialRows(local,cloud);persistLocal();await dbRef.set(rowsObject(DB))}
     refreshData();setSync('online');toast(`Sync complete: ${DB.length} reports`,'success');
-  }catch(e){console.warn(e);setSync('error');toast('Sync failed. Local reports were preserved; try again later.','warn')}
+  }catch(e){console.warn(e);setSync('error');toast('Sync failed. Local reports preserved.','warn')}
   hideLoader();
 }
 
 /* ---------- Events ---------- */
 const actions={
   tab:b=>{if(b.dataset.tab!==tab)showTab(b.dataset.tab)},
-  new:()=>newEntry(),
-  save:saveData,
-  'copy-last':copyLast,
-  prev:()=>navigate('prev'),
-  next:()=>navigate('next'),
+  new:()=>newEntry(),save:saveData,'copy-last':copyLast,
+  prev:()=>navigate('prev'),next:()=>navigate('next'),
   'add-row':()=>{addRow({},true);setDirty(true);scheduleDraft()},
   'remove-row':b=>{
     if(document.querySelectorAll('.entry').length<=1){toast('A report needs at least one activity box','info');return}
@@ -646,23 +737,15 @@ const actions={
   edit:b=>{const r=DB.find(x=>x.id===b.dataset.id);if(r&&confirmDiscard())openRecord(r)},
   del:b=>{if(confirm('Delete this report?'))deleteRecords([b.dataset.id])},
   'del-selected':()=>{if(selected.size&&confirm(`Delete ${selected.size} selected report(s)?`))deleteRecords([...selected])},
-  'select-all':()=>{
-    const list=filtered(),all=list.every(r=>selected.has(r.id));
-    list.forEach(r=>all?selected.delete(r.id):selected.add(r.id));renderHistory();
-  },
+  'select-all':()=>{const list=filtered(),all=list.every(r=>selected.has(r.id));list.forEach(r=>all?selected.delete(r.id):selected.add(r.id));renderHistory()},
   'reset-filters':()=>{['hSearch','dateFrom','dateTo'].forEach(i=>$(i).value='');$('hShift').value='all';renderHistory()},
   pdf:exportPDF,excel:exportExcel,print:printReports,
-  'json-backup':exportJSON,
-  restore:()=>$('restoreInput').click(),
-  sync:syncNow,
+  'json-backup':exportJSON,restore:()=>$('restoreInput').click(),sync:syncNow,
   theme:()=>{const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';applyTheme(t);store.set('theme',t)}
 };
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
-  if(b&&actions[b.dataset.act]){
-    if(e.target.closest('#menu'))$('menu').open=false;
-    actions[b.dataset.act](b,e);return;
-  }
+  if(b&&actions[b.dataset.act]){if(e.target.closest('#menu'))$('menu').open=false;actions[b.dataset.act](b,e);return}
   if(!e.target.closest('#menu'))$('menu').open=false;
 });
 $('historyList').addEventListener('change',e=>{
@@ -673,8 +756,7 @@ $('yearSel').addEventListener('change',renderAnalytics);
 $('dashYear').addEventListener('change',renderDashboard);
 $('restoreInput').addEventListener('change',handleRestore);
 $('gotoDate').addEventListener('change',e=>{
-  const d=e.target.value;e.target.value='';
-  if(!d)return;
+  const d=e.target.value;e.target.value='';if(!d)return;
   const r=DB.find(x=>x.date===d);
   if(!r){toast(`No report saved for ${d}`,'info');return}
   if(confirmDiscard())openRecord(r);
@@ -712,18 +794,18 @@ function bootAuthenticatedUser(user){
 function bootSignedOut(){stopCloud();currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();showAuthError('');
-  if(!firebaseReady||!auth){showAuthError('Setup required: replace the Firebase config placeholders in this file and enable Email/Password sign-in in Firebase Console.');return}
+  if(!firebaseReady||!auth){showAuthError('Setup required: configure Firebase and enable Email/Password sign-in.');return}
   $('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';
   try{await auth.signInWithEmailAndPassword($('loginEmail').value.trim(),$('loginPassword').value)}
   catch(err){showAuthError(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'?'Email or password is incorrect.':err.message)}
   finally{$('loginBtn').disabled=false;$('loginBtn').textContent='Sign in'}
 });
 $('resetPasswordBtn').addEventListener('click',async()=>{
-  showAuthError('');if(!firebaseReady||!auth){showAuthError('Configure Firebase first, then reset your password.');return}
+  showAuthError('');if(!firebaseReady||!auth){showAuthError('Configure Firebase first.');return}
   const email=$('loginEmail').value.trim();if(!email){showAuthError('Enter your work email first.');return}
   try{await auth.sendPasswordResetEmail(email);showAuthError('Password reset email sent if the account exists.')}catch(err){showAuthError(err.message)}
 });
 $('signOutBtn').addEventListener('click',async()=>{if(dirty&&!confirmDiscard())return;try{await auth.signOut()}catch(err){toast('Could not sign out: '+err.message,'error')}});
 if(firebaseReady&&auth)auth.onAuthStateChanged(user=>{if(user)bootAuthenticatedUser(user);else bootSignedOut()});
-else{bootSignedOut();showAuthError('Setup required: replace the Firebase config placeholders in index.html and enable Email/Password sign-in in Firebase Console.')}
+else{bootSignedOut();showAuthError('Setup required: configure Firebase and enable Email/Password sign-in in Firebase Console.')}
 })();
