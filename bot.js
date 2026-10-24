@@ -1,30 +1,23 @@
+[file-tag: bot.js]
 const express = require('express');
 const TelegramBotLib = require('node-telegram-bot-api');
 
-// Express Keep-Alive Server (For Render 24/7 Deployment)
+// Express Server & Webhook Configuration for Render 24/7 Stability
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
+const TOKEN = process.env.TOKEN || '8684300697:AAFMHJpvfLdROY7b7Xk0TWaxtYT6QVx2FmU';
+const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL || 'https://infinite-v1-default-rtdb.firebaseio.com';
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://report-pro-m2b2.onrender.com';
 
 app.get('/', (req, res) => {
-  res.send('🤖 Telegram Form-based AI Bot is Active and Running 24/7!');
+  res.send('🤖 Telegram Form-based AI Bot is Active and Running 24/7 via Webhook!');
 });
 
 const server = app.listen(PORT, () => {
-  console.log(`🌐 Keep-alive HTTP server running on port ${PORT}`);
+  console.log(`🌐 HTTP server running on port ${PORT}`);
 });
-
-// Self-Ping Mechanism to prevent Render Sleep Mode
-const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
-if (RENDER_URL) {
-  setInterval(async () => {
-    try {
-      await fetch(RENDER_URL);
-      console.log('⏰ Self-ping successful! Keeping bot alive.');
-    } catch (err) {
-      console.error('❌ Self-ping error:', err.message);
-    }
-  }, 10 * 60 * 1000); // Ping every 10 minutes
-}
 
 // TelegramBot Constructor Resolver
 const TelegramBot = typeof TelegramBotLib === 'function' 
@@ -36,27 +29,21 @@ if (typeof TelegramBot !== 'function') {
   process.exit(1);
 }
 
-// Bot Credentials & Firebase Configuration
-const TOKEN = process.env.TOKEN || '8684300697:AAFMHJpvfLdROY7b7Xk0TWaxtYT6QVx2FmU';
-const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL || 'https://infinite-v1-default-rtdb.firebaseio.com';
+// Initialize Bot without Polling (Using Webhook for 100% Stability & No 409 Conflicts)
+const bot = new TelegramBot(TOKEN);
 
-// Improved Polling Configuration
-const bot = new TelegramBot(TOKEN, { 
-  polling: {
-    autoStart: true,
-    params: {
-      timeout: 10
-    }
-  } 
+// Set Telegram Webhook
+const webhookUrl = `${RENDER_URL.replace(/\/$/, '')}/bot${TOKEN}`;
+bot.setWebHook(webhookUrl).then(() => {
+  console.log(`🔗 Webhook successfully set to: ${webhookUrl}`);
+}).catch(err => {
+  console.error('❌ Failed to set webhook:', err.message);
 });
 
-// Prevent Unhandled Polling Error Crash
-bot.on('polling_error', (error) => {
-  if (error.code === 'ETELEGRAM' && error.message.includes('409 Conflict')) {
-    console.log('⚠️ Polling conflict detected (another instance restarting). Retrying...');
-  } else {
-    console.error('⚠️ Polling Error:', error.message || error);
-  }
+// Express Endpoint to Receive Telegram Updates
+app.post(`/bot${TOKEN}`, (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
 });
 
 // Cache processed message IDs & Active Chat Locks
@@ -72,7 +59,7 @@ const todayStr = () => {
   return new Date(d - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 };
 
-// Helper: Normalize Time to 24-Hour "HH:mm" Format for Web App Compatibility
+// Helper: Normalize Time to 24-Hour "HH:mm" Format
 function normalizeTime(timeInput) {
   if (!timeInput) return '09:00';
   let str = timeInput.trim().toUpperCase();
@@ -116,7 +103,7 @@ async function saveToFirebase(reportData) {
   const id = reportData.id || (Date.now().toString() + Math.floor(100 + Math.random() * 900));
   reportData.id = id;
   reportData.updatedAt = Date.now();
-  reportData.schemaVersion = 2;
+  reportData.schemaVersion = 3;
 
   const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports/${id}.json`;
   try {
@@ -155,14 +142,14 @@ bot.on('message', async (msg) => {
     // 1. START COMMAND
     if (lowerText === '/start' || lowerText === 'start') {
       activeFrames[chatId] = {
-        step: 'WAITING_FOR_START_TIME',
+        step: 'WAITING_FOR_DATE',
         date: todayStr(),
         startTime: '',
         endTime: '',
         rows: []
       };
 
-      await bot.sendMessage(chatId, `📋 *NEW REPORT FRAME STARTED*\n\nDate: ${todayStr()}\nFrom: [Enter Start Time, e.g. 09:00]\n\nPlease reply with your duty *Start Time* (e.g. 09:00):`, { parse_mode: 'Markdown' });
+      await bot.sendMessage(chatId, `📋 *NEW REPORT FRAME STARTED*\n\nDefault Date: ${todayStr()}\n\nReply with your report date (e.g., \`${todayStr()}\` or custom date like \`2026-10-23\`), or type \`today\` to use today:`, { parse_mode: 'Markdown' });
       return;
     }
 
@@ -172,7 +159,20 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 2. SET START TIME (FROM)
+    // 2. SET DATE (CUSTOM OR TODAY)
+    if (frame.step === 'WAITING_FOR_DATE') {
+      if (lowerText !== 'today' && text.length >= 8) {
+        frame.date = text;
+      } else {
+        frame.date = todayStr();
+      }
+      frame.step = 'WAITING_FOR_START_TIME';
+
+      await bot.sendMessage(chatId, `✅ *Date Set: ${frame.date}*\n\nPlease reply with your duty *Start Time* (e.g. 09:00):`, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // 3. SET START TIME (FROM)
     if (frame.step === 'WAITING_FOR_START_TIME') {
       frame.startTime = normalizeTime(text);
       frame.step = 'READY_FOR_ACTIVITY';
@@ -181,13 +181,13 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 3. ADD NEW ACTIVITY LOG FRAME
+    // 4. ADD NEW ACTIVITY LOG FRAME
     if (lowerText === 'add') {
       await bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*\n\nPura structure copy kore fill-up kore pathan:\n\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
       return;
     }
 
-    // 4. PARSE FILLED ACTIVITY FORM
+    // 5. PARSE FILLED ACTIVITY FORM
     if (lowerText.includes('client:') || lowerText.includes('site code:')) {
       const lines = text.split('\n');
       const getVal = (prefix) => {
@@ -210,7 +210,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 5. END COMMAND / COMPLETE REPORT
+    // 6. END COMMAND / COMPLETE REPORT
     if (lowerText === 'end' || lowerText === '/end') {
       if (frame.rows.length === 0) {
         await bot.sendMessage(chatId, `⚠️ Kono activity add kora hoy ni. Age structure fill-up korun ba *"add"* likhun.`);
@@ -222,7 +222,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 6. SET END TIME (TO) & SAVE TO FIREBASE
+    // 7. SET END TIME (TO) & SAVE TO FIREBASE
     if (frame.step === 'WAITING_FOR_END_TIME') {
       frame.endTime = normalizeTime(text);
       const totalOT = calculateOT(frame.startTime, frame.endTime);
@@ -266,9 +266,8 @@ bot.on('message', async (msg) => {
 
 // Graceful Shutdown for Render
 process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, stopping polling...');
-  bot.stopPolling();
+  console.log('👋 SIGTERM received, closing server...');
   server.close(() => process.exit(0));
 });
 
-console.log('🤖 Dynamic Form-based Telegram Bot is running...');
+console.log('🤖 Webhook-based Telegram Bot is running...');
