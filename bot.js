@@ -119,7 +119,7 @@ async function saveToFirebase(reportData) {
   }
 }
 
-// Fetch report by date from Firebase
+// Fetch report by date from Firebase with robust string matching
 async function findReportByDate(targetDate) {
   const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports.json`;
   try {
@@ -128,7 +128,13 @@ async function findReportByDate(targetDate) {
     const data = await response.json();
     if (!data) return null;
 
-    const reportKey = Object.keys(data).find(key => data[key].date === targetDate);
+    const cleanTarget = targetDate.trim();
+    const reportKey = Object.keys(data).find(key => {
+      const report = data[key];
+      if (!report || !report.date) return false;
+      return report.date.toString().trim() === cleanTarget;
+    });
+
     return reportKey ? { key: reportKey, data: data[reportKey] } : null;
   } catch (err) {
     console.error('❌ Firebase Fetch Error:', err);
@@ -154,87 +160,99 @@ bot.on('message', async (msg) => {
 
     const lowerText = text.toLowerCase();
 
-    // ==================== EDIT REPORT FLOW ====================
+    // 1. CANCEL / RESET COMMANDS
+    if (lowerText === '/cancel' || lowerText === 'cancel') {
+      delete activeFrames[chatId];
+      delete editFrames[chatId];
+      await bot.sendMessage(chatId, `❌ Current operation cancelled.`);
+      return;
+    }
+
+    // 2. EDIT COMMAND INITIATION
     if (lowerText === '/edit' || lowerText === 'edit') {
-      editFrames[chatId] = { step: 'WAITING_FOR_EDIT_DATE' };
+      delete activeFrames[chatId]; // Clear regular frame if any
+      editFrames[chatId] = { step: 'WAITING_FOR_EDIT_DATE', newRows: [] };
       await bot.sendMessage(chatId, `✏️ *EDIT REPORT MODE*\n\nJe tarikh er report edit korte chan, sei tarikh ti din (e.g., \`${todayStr()}\`):`, { parse_mode: 'Markdown' });
       return;
     }
 
-    let editFrame = editFrames[chatId];
-    if (editFrame && editFrame.step === 'WAITING_FOR_EDIT_DATE') {
-      const targetDate = text;
-      await bot.sendMessage(chatId, `⏳ Searching report for date: *${targetDate}*...`, { parse_mode: 'Markdown' });
-      
-      const found = await findReportByDate(targetDate);
-      if (!found) {
-        delete editFrames[chatId];
-        await bot.sendMessage(chatId, `❌ Ei tarikh (\`${targetDate}\`) er kono report pawa jayni!`, { parse_mode: 'Markdown' });
-        return;
-      }
+    // 3. HANDLE ACTIVE EDIT FLOW
+    if (editFrames[chatId]) {
+      let editFrame = editFrames[chatId];
 
-      editFrames[chatId] = {
-        step: 'READY_TO_MODIFY',
-        reportKey: found.key,
-        report: found.data,
-        newRows: []
-      };
-
-      let summaryText = found.data.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
-
-      await bot.sendMessage(chatId, `✅ *Report Found!*\n\n📅 Date: ${found.data.date}\n⏰ From: ${found.data.startTime} | To: ${found.data.endTime}\n\n--- *EXISTING ACTIVITIES* ---\n${summaryText}\n\nNotun kore activities add ba change korte format fill-up kore pathan, ebong seshe **"commit"** likhun.`, { parse_mode: 'Markdown' });
-      return;
-    }
-
-    if (editFrame && editFrame.step === 'READY_TO_MODIFY') {
-      if (lowerText.includes('client:') || lowerText.includes('site code:')) {
-        const lines = text.split('\n');
-        const getVal = (prefix) => {
-          const line = lines.find(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
-          return line ? line.split(':').slice(1).join(':').trim() : '';
-        };
-
-        const rowObj = {
-          c: getVal('Client'),
-          s: getVal('Site code').toUpperCase(),
-          cat: getVal('Category') || 'Implementation',
-          w: getVal('Activity details'),
-          ab: getVal('Assigned by') || 'MD Azmir Hossain',
-          t: getVal('Team person') || 'N/A'
-        };
-
-        editFrame.newRows.push(rowObj);
-        await bot.sendMessage(chatId, `✅ Modified Activity Added (${editFrame.newRows.length})\nAro add korte format din ba save korte **"commit"** likhun.`);
-        return;
-      }
-
-      if (lowerText === 'commit' || lowerText === '/commit') {
-        if (!editFrame.newRows || editFrame.newRows.length === 0) {
-          await bot.sendMessage(chatId, `⚠️ Kono notun/modified activity add kora hoyni!`);
+      if (editFrame.step === 'WAITING_FOR_EDIT_DATE') {
+        const targetDate = text;
+        await bot.sendMessage(chatId, `⏳ Searching report for date: *${targetDate}*...`, { parse_mode: 'Markdown' });
+        
+        const found = await findReportByDate(targetDate);
+        if (!found) {
+          delete editFrames[chatId];
+          await bot.sendMessage(chatId, `❌ Ei tarikh (\`${targetDate}\`) er kono report pawa jayni!`, { parse_mode: 'Markdown' });
           return;
         }
 
-        let reportToUpdate = editFrame.report;
-        reportToUpdate.id = editFrame.reportKey;
-        reportToUpdate.rows = editFrame.newRows;
-        reportToUpdate.ot = calculateOT(reportToUpdate.startTime, reportToUpdate.endTime);
+        editFrame.step = 'READY_TO_MODIFY';
+        editFrame.reportKey = found.key;
+        editFrame.report = found.data;
+        editFrame.newRows = []; // Fresh array for updated activities
 
-        await bot.sendMessage(chatId, `⏳ Updating report in Firebase...`);
-        const saved = await saveToFirebase(reportToUpdate);
+        let summaryText = found.data.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
 
-        if (saved) {
-          delete editFrames[chatId];
-          await bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY COMMITTED & UPDATED!* 🚀\n\n📅 Date: ${reportToUpdate.date}\n⌛ Total OT: ${reportToUpdate.ot}`, { parse_mode: 'Markdown' });
-        } else {
-          await bot.sendMessage(chatId, `❌ Update failed! Please try again.`);
-        }
+        await bot.sendMessage(chatId, `✅ *Report Found!*\n\n📅 Date: ${found.data.date}\n⏰ From: ${found.data.startTime} | To: ${found.data.endTime}\n\n--- *EXISTING ACTIVITIES* ---\n${summaryText}\n\nNotun kore activities add ba change korte format fill-up kore pathan, ebong seshe **"commit"** likhun.`, { parse_mode: 'Markdown' });
         return;
       }
-    }
-    // ==========================================================
 
-    // 1. START COMMAND
+      if (editFrame.step === 'READY_TO_MODIFY') {
+        if (lowerText.includes('client:') || lowerText.includes('site code:')) {
+          const lines = text.split('\n');
+          const getVal = (prefix) => {
+            const line = lines.find(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
+            return line ? line.split(':').slice(1).join(':').trim() : '';
+          };
+
+          const rowObj = {
+            c: getVal('Client'),
+            s: getVal('Site code').toUpperCase(),
+            cat: getVal('Category') || 'Implementation',
+            w: getVal('Activity details'),
+            ab: getVal('Assigned by') || 'MD Azmir Hossain',
+            t: getVal('Team person') || 'N/A'
+          };
+
+          editFrame.newRows.push(rowObj);
+          await bot.sendMessage(chatId, `✅ Modified Activity Added (${editFrame.newRows.length})\nAro add korte format din ba save korte **"commit"** likhun.`);
+          return;
+        }
+
+        if (lowerText === 'commit' || lowerText === '/commit') {
+          if (!editFrame.newRows || editFrame.newRows.length === 0) {
+            await bot.sendMessage(chatId, `⚠️ Kono notun/modified activity add kora hoyni! Format fill-up kore pathan.`);
+            return;
+          }
+
+          let reportToUpdate = editFrame.report;
+          reportToUpdate.id = editFrame.reportKey;
+          reportToUpdate.rows = editFrame.newRows;
+          reportToUpdate.ot = calculateOT(reportToUpdate.startTime, reportToUpdate.endTime);
+
+          await bot.sendMessage(chatId, `⏳ Updating report in Firebase...`);
+          const saved = await saveToFirebase(reportToUpdate);
+
+          if (saved) {
+            delete editFrames[chatId];
+            await bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY COMMITTED & UPDATED!* 🚀\n\n📅 Date: ${reportToUpdate.date}\n⌛ Total OT: ${reportToUpdate.ot}`, { parse_mode: 'Markdown' });
+          } else {
+            await bot.sendMessage(chatId, `❌ Update failed! Please try again.`);
+          }
+          return;
+        }
+      }
+      return; // Stop further processing if inside edit flow
+    }
+
+    // 4. START NEW REPORT COMMAND
     if (lowerText === '/start' || lowerText === 'start') {
+      delete editFrames[chatId]; // Clear edit frame if any
       activeFrames[chatId] = {
         step: 'WAITING_FOR_DATE',
         date: todayStr(),
@@ -253,7 +271,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 2. SET DATE (CUSTOM OR TODAY)
+    // 5. SET DATE (CUSTOM OR TODAY)
     if (frame.step === 'WAITING_FOR_DATE') {
       if (lowerText !== 'today' && text.length >= 8) {
         frame.date = text;
@@ -266,7 +284,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 3. SET START TIME (FROM)
+    // 6. SET START TIME (FROM)
     if (frame.step === 'WAITING_FOR_START_TIME') {
       frame.startTime = normalizeTime(text);
       frame.step = 'READY_FOR_ACTIVITY';
@@ -275,13 +293,13 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 4. ADD NEW ACTIVITY LOG FRAME
+    // 7. ADD NEW ACTIVITY LOG FRAME
     if (lowerText === 'add') {
       await bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*\n\nPura structure copy kore fill-up kore pathan:\n\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
       return;
     }
 
-    // 5. PARSE FILLED ACTIVITY FORM
+    // 8. PARSE FILLED ACTIVITY FORM
     if (lowerText.includes('client:') || lowerText.includes('site code:')) {
       const lines = text.split('\n');
       const getVal = (prefix) => {
@@ -304,7 +322,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 6. END COMMAND / COMPLETE REPORT
+    // 9. END COMMAND / COMPLETE REPORT
     if (lowerText === 'end' || lowerText === '/end') {
       if (frame.rows.length === 0) {
         await bot.sendMessage(chatId, `⚠️ Kono activity add kora hoy ni. Age structure fill-up korun ba *"add"* likhun.`);
@@ -316,7 +334,7 @@ bot.on('message', async (msg) => {
       return;
     }
 
-    // 7. SET END TIME (TO) & SAVE TO FIREBASE
+    // 10. SET END TIME (TO) & SAVE TO FIREBASE
     if (frame.step === 'WAITING_FOR_END_TIME') {
       frame.endTime = normalizeTime(text);
       const totalOT = calculateOT(frame.startTime, frame.endTime);
@@ -336,6 +354,7 @@ bot.on('message', async (msg) => {
         rows: frame.rows
       };
 
+	  // If updating existing via normal flow or saving new
       await bot.sendMessage(chatId, `⏳ Syncing final report to Firebase...`);
       const saved = await saveToFirebase(finalReport);
 
