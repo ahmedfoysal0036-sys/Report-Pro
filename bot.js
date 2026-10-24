@@ -59,8 +59,9 @@ bot.on('polling_error', (error) => {
   }
 });
 
-// Cache processed message IDs to prevent duplicate execution
+// Cache processed message IDs & Active Chat Locks
 const processedMsgIds = new Set();
+const processingChats = new Set(); // Prevents overlapping async triggers
 
 // Active user report frames
 const activeFrames = {};
@@ -131,129 +132,135 @@ async function saveToFirebase(reportData) {
   }
 }
 
-// Telegram Message Listener
+// Telegram Message Listener with Chat-Level Concurrency Lock
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const msgId = msg.message_id;
 
-  // Prevent processing the same message ID twice
-  if (processedMsgIds.has(msgId)) {
-    return;
-  }
+  // Prevent duplicate message processing
+  if (processedMsgIds.has(msgId)) return;
   processedMsgIds.add(msgId);
+  if (processedMsgIds.size > 200) processedMsgIds.clear();
 
-  // Clear memory cache every 5 minutes
-  if (processedMsgIds.size > 200) {
-    processedMsgIds.clear();
-  }
+  // Prevent overlapping execution for the same chat
+  if (processingChats.has(chatId)) return;
+  processingChats.add(chatId);
 
-  const text = (msg.text || '').trim();
-  if (!text) return;
+  try {
+    const text = (msg.text || '').trim();
+    if (!text) return;
 
-  const lowerText = text.toLowerCase();
+    const lowerText = text.toLowerCase();
 
-  // 1. START COMMAND
-  if (lowerText === '/start' || lowerText === 'start') {
-    activeFrames[chatId] = {
-      step: 'WAITING_FOR_START_TIME',
-      date: todayStr(),
-      startTime: '',
-      endTime: '',
-      rows: []
-    };
+    // 1. START COMMAND
+    if (lowerText === '/start' || lowerText === 'start') {
+      activeFrames[chatId] = {
+        step: 'WAITING_FOR_START_TIME',
+        date: todayStr(),
+        startTime: '',
+        endTime: '',
+        rows: []
+      };
 
-    bot.sendMessage(chatId, `📋 *NEW REPORT FRAME STARTED*\n\nDate: ${todayStr()}\nFrom: [Enter Start Time, e.g. 09:00]\n\nPlease reply with your duty *Start Time* (e.g. 09:00):`, { parse_mode: 'Markdown' });
-    return;
-  }
-
-  let frame = activeFrames[chatId];
-  if (!frame) {
-    bot.sendMessage(chatId, `💡 Direct frame-wise report shuru korte *"start"* likhun.`);
-    return;
-  }
-
-  // 2. SET START TIME (FROM)
-  if (frame.step === 'WAITING_FOR_START_TIME') {
-    frame.startTime = normalizeTime(text);
-    frame.step = 'READY_FOR_ACTIVITY';
-
-    bot.sendMessage(chatId, `✅ *Start Time Set: ${frame.startTime}*\n\nAro activity jog korte template puron kore pathan ba *"add"* command din.\n\n*Activity Format:*\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
-    return;
-  }
-
-  // 3. ADD NEW ACTIVITY LOG FRAME
-  if (lowerText === 'add') {
-    bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*\n\nPura structure copy kore fill-up kore pathan:\n\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
-    return;
-  }
-
-  // 4. PARSE FILLED ACTIVITY FORM
-  if (lowerText.includes('client:') || lowerText.includes('site code:')) {
-    const lines = text.split('\n');
-    const getVal = (prefix) => {
-      const line = lines.find(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
-      return line ? line.split(':').slice(1).join(':').trim() : '';
-    };
-
-    const rowObj = {
-      c: getVal('Client'),
-      s: getVal('Site code').toUpperCase(),
-      cat: getVal('Category') || 'Implementation',
-      w: getVal('Activity details'),
-      ab: getVal('Assigned by') || 'MD Azmir Hossain',
-      t: getVal('Team person') || 'N/A'
-    };
-
-    frame.rows.push(rowObj);
-
-    bot.sendMessage(chatId, `✅ *Activity ${frame.rows.length} Added!*\n\n🏢 Client: ${rowObj.c || 'N/A'}\n📍 Site Code: ${rowObj.s || 'N/A'}\n🏷 Category: ${rowObj.cat}\n📝 Details: ${rowObj.w}\n👤 Assigned By: ${rowObj.ab}\n👥 Team: ${rowObj.t}\n\nAro activity jog korte *"add"* likhun ba format fill-up korun.\nReport sesh korte *"end"* likhun.`, { parse_mode: 'Markdown' });
-    return;
-  }
-
-  // 5. END COMMAND / COMPLETE REPORT
-  if (lowerText === 'end' || lowerText === '/end') {
-    if (frame.rows.length === 0) {
-      bot.sendMessage(chatId, `⚠️ Kono activity add kora hoy ni. Age structure fill-up korun ba *"add"* likhun.`);
+      await bot.sendMessage(chatId, `📋 *NEW REPORT FRAME STARTED*\n\nDate: ${todayStr()}\nFrom: [Enter Start Time, e.g. 09:00]\n\nPlease reply with your duty *Start Time* (e.g. 09:00):`, { parse_mode: 'Markdown' });
       return;
     }
 
-    frame.step = 'WAITING_FOR_END_TIME';
-    bot.sendMessage(chatId, `⏹ *FINISHING REPORT*\n\nPlease enter your duty *End Time / To* (e.g. 18:00 or 11:00):`, { parse_mode: 'Markdown' });
-    return;
-  }
-
-  // 6. SET END TIME (TO) & SAVE TO FIREBASE
-  if (frame.step === 'WAITING_FOR_END_TIME') {
-    frame.endTime = normalizeTime(text);
-    const totalOT = calculateOT(frame.startTime, frame.endTime);
-    const mainAssigned = frame.rows[0]?.ab || 'MD Azmir Hossain';
-
-    const finalReport = {
-      id: Date.now().toString(),
-      date: frame.date,
-      startTime: frame.startTime,
-      endTime: frame.endTime,
-      ot: totalOT,
-      hr: '0036',
-      assigned: mainAssigned,
-      name: 'S.M.Faisal Ahmed',
-      desig: 'Sr Supervisor',
-      shift: 'DAY',
-      rows: frame.rows
-    };
-
-    bot.sendMessage(chatId, `⏳ Syncing final report to Firebase...`);
-    const saved = await saveToFirebase(finalReport);
-
-    if (saved) {
-      delete activeFrames[chatId];
-      let summaryText = finalReport.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
-
-      bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY SUBMITTED!*\n\n📅 *Date:* ${finalReport.date}\n⏰ *From:* ${finalReport.startTime}\n⏱ *To:* ${finalReport.endTime}\n⌛ *Total OT:* ${finalReport.ot}\n\n--- *SUMMARY* ---\n${summaryText}`, { parse_mode: 'Markdown' });
-    } else {
-      bot.sendMessage(chatId, `❌ Firebase save failed! Check connection and try typing end time again.`);
+    let frame = activeFrames[chatId];
+    if (!frame) {
+      await bot.sendMessage(chatId, `💡 Direct frame-wise report shuru korte *"start"* likhun.`);
+      return;
     }
-    return;
+
+    // 2. SET START TIME (FROM)
+    if (frame.step === 'WAITING_FOR_START_TIME') {
+      frame.startTime = normalizeTime(text);
+      frame.step = 'READY_FOR_ACTIVITY';
+
+      await bot.sendMessage(chatId, `✅ *Start Time Set: ${frame.startTime}*\n\nAro activity jog korte template puron kore pathan ba *"add"* command din.\n\n*Activity Format:*\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // 3. ADD NEW ACTIVITY LOG FRAME
+    if (lowerText === 'add') {
+      await bot.sendMessage(chatId, `📌 *ADD ACTIVITY LOG*\n\nPura structure copy kore fill-up kore pathan:\n\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam person: `, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // 4. PARSE FILLED ACTIVITY FORM
+    if (lowerText.includes('client:') || lowerText.includes('site code:')) {
+      const lines = text.split('\n');
+      const getVal = (prefix) => {
+        const line = lines.find(l => l.toLowerCase().startsWith(prefix.toLowerCase()));
+        return line ? line.split(':').slice(1).join(':').trim() : '';
+      };
+
+      const rowObj = {
+        c: getVal('Client'),
+        s: getVal('Site code').toUpperCase(),
+        cat: getVal('Category') || 'Implementation',
+        w: getVal('Activity details'),
+        ab: getVal('Assigned by') || 'MD Azmir Hossain',
+        t: getVal('Team person') || 'N/A'
+      };
+
+      frame.rows.push(rowObj);
+
+      await bot.sendMessage(chatId, `✅ *Activity ${frame.rows.length} Added!*\n\n🏢 Client: ${rowObj.c || 'N/A'}\n📍 Site Code: ${rowObj.s || 'N/A'}\n🏷 Category: ${rowObj.cat}\n📝 Details: ${rowObj.w}\n👤 Assigned By: ${rowObj.ab}\n👥 Team: ${rowObj.t}\n\nAro activity jog korte *"add"* likhun ba format fill-up korun.\nReport sesh korte *"end"* likhun.`, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // 5. END COMMAND / COMPLETE REPORT
+    if (lowerText === 'end' || lowerText === '/end') {
+      if (frame.rows.length === 0) {
+        await bot.sendMessage(chatId, `⚠️ Kono activity add kora hoy ni. Age structure fill-up korun ba *"add"* likhun.`);
+        return;
+      }
+
+      frame.step = 'WAITING_FOR_END_TIME';
+      await bot.sendMessage(chatId, `⏹ *FINISHING REPORT*\n\nPlease enter your duty *End Time / To* (e.g. 18:00 or 11:00):`, { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // 6. SET END TIME (TO) & SAVE TO FIREBASE
+    if (frame.step === 'WAITING_FOR_END_TIME') {
+      frame.endTime = normalizeTime(text);
+      const totalOT = calculateOT(frame.startTime, frame.endTime);
+      const mainAssigned = frame.rows[0]?.ab || 'MD Azmir Hossain';
+
+      const finalReport = {
+        id: Date.now().toString(),
+        date: frame.date,
+        startTime: frame.startTime,
+        endTime: frame.endTime,
+        ot: totalOT,
+        hr: '0036',
+        assigned: mainAssigned,
+        name: 'S.M.Faisal Ahmed',
+        desig: 'Sr Supervisor',
+        shift: 'DAY',
+        rows: frame.rows
+      };
+
+      await bot.sendMessage(chatId, `⏳ Syncing final report to Firebase...`);
+      const saved = await saveToFirebase(finalReport);
+
+      if (saved) {
+        delete activeFrames[chatId];
+        let summaryText = finalReport.rows.map((r, i) => `*Activity ${i+1}:*\nClient: ${r.c}\nSite: ${r.s}\nCategory: ${r.cat}\nDetails: ${r.w}`).join('\n\n');
+
+        await bot.sendMessage(chatId, `✅ *REPORT SUCCESSFULLY SUBMITTED!*\n\n📅 *Date:* ${finalReport.date}\n⏰ *From:* ${finalReport.startTime}\n⏱ *To:* ${finalReport.endTime}\n⌛ *Total OT:* ${finalReport.ot}\n\n--- *SUMMARY* ---\n${summaryText}`, { parse_mode: 'Markdown' });
+      } else {
+        await bot.sendMessage(chatId, `❌ Firebase save failed! Check connection and try typing end time again.`);
+      }
+      return;
+    }
+
+  } catch (err) {
+    console.error('❌ Bot Error:', err);
+  } finally {
+    // Release the chat lock once processing is complete
+    processingChats.delete(chatId);
   }
 });
 
