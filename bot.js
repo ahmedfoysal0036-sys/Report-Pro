@@ -508,6 +508,28 @@ bot.on('message', async (msg) => {
   }
 });
 
+// ── Keep-alive self-ping (prevents Render free-tier sleep) ──────────────────
+// Pings our own health endpoint every 13 minutes so Render never idles out.
+const PING_INTERVAL_MS = 13 * 60 * 1000; // 13 minutes
+
+async function keepAlive() {
+  const pingUrl = `${RENDER_URL.replace(/\/$/, '')}/`;
+  try {
+    const res = await fetch(pingUrl, { method: 'GET' });
+    console.log(`✅ Keep-alive ping OK (${res.status}) → ${pingUrl}`);
+  } catch (err) {
+    console.warn(`⚠️  Keep-alive ping failed: ${err.message}`);
+  }
+}
+
+// Start pinging after a short initial delay so the server is fully up first.
+setTimeout(() => {
+  keepAlive(); // first ping
+  setInterval(keepAlive, PING_INTERVAL_MS);
+}, 30_000);
+
+console.log(`⏰ Keep-alive loop scheduled every ${PING_INTERVAL_MS / 60000} minutes.`);
+
 // Graceful Shutdown for Render
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM received, closing server...');
