@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const TelegramBotLib = require('node-telegram-bot-api');
 
 // Express Server & Webhook Configuration for Render 24/7 Stability
@@ -34,7 +34,7 @@ const bot = new TelegramBot(TOKEN);
 // Set Telegram Webhook
 const webhookUrl = `${RENDER_URL.replace(/\/$/, '')}/bot${TOKEN}`;
 bot.setWebHook(webhookUrl).then(() => {
-  console.log(`🔗 Webhook successfully set to: ${webhookUrl}`);
+  console.log(`🔗 Webhook successfully set`);
 }).catch(err => {
   console.error('❌ Failed to set webhook:', err.message);
 });
