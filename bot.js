@@ -12,7 +12,8 @@ const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL || 'https://infinite-v1-defa
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://report-pro-m2b2.onrender.com';
 
 // ── Firebase Admin SDK (bypasses DB rules; rules stay locked for the public) ──
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getDatabase } = require('firebase-admin/database');
 function loadServiceAccount() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT env var missing');
@@ -23,8 +24,8 @@ function loadServiceAccount() {
 let adminDb = null;
 try {
   const sa = loadServiceAccount();
-  admin.initializeApp({ credential: admin.credential.cert(sa), databaseURL: FIREBASE_DB_URL });
-  adminDb = admin.database();
+  const fbApp = initializeApp({ credential: cert(sa), databaseURL: FIREBASE_DB_URL });
+  adminDb = getDatabase(fbApp);
   console.log(`🔐 Firebase Admin ready (project: ${sa.project_id})`);
 } catch (e) {
   console.error('❌ Firebase Admin init failed:', e.message);
