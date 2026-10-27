@@ -6,8 +6,10 @@ Build a mobile-first, installable-feeling web app called "Activity Tracker – D
 - Frontend: plain HTML + CSS + vanilla JavaScript only. No framework, no build step. Three files: index.html, style.css, app.js (app.js wrapped in one IIFE with 'use strict').
 - Libraries via CDN `<script>` tags: html2canvas 1.4.1, jsPDF 2.5.1 (UMD), SheetJS xlsx 0.18.5, Firebase 9.23 compat (app, auth, database). Font: Inter (Google Fonts).
 - Hosting: Firebase Hosting. Database: Firebase Realtime Database, path `/reports/{id}`. Auth: Firebase Authentication, email + password only, NO public sign-up (admin creates accounts in the console).
-- Bot: Node.js + Express + node-telegram-bot-api, deployed on Render using a webhook (not polling), with a keep-alive self-ping every 13 minutes and graceful SIGTERM shutdown.
-- All secrets (bot token, DB URL, Render URL) must come from environment variables. Never hardcode them.
+- Bot: Node.js + Express + node-telegram-bot-api (legacy 0.x API: `bot.sendMessage(chatId, text, opts)`, `bot.processUpdate`), deployed on Render using a webhook (not polling), with a keep-alive self-ping every 13 minutes and graceful SIGTERM shutdown. Do NOT upgrade to node-telegram-bot-api 2.x (different API); optionally replace the library with direct `fetch` calls to the Telegram Bot API.
+- The bot talks to Firebase with the **Firebase Admin SDK** (`firebase-admin/app` + `firebase-admin/database`, modular imports; the namespaced `admin.credential.cert` style no longer works in v14), authenticated with a service account from the `FIREBASE_SERVICE_ACCOUNT` env var (raw JSON or base64 JSON). Admin SDK bypasses database rules.
+- All secrets must come from environment variables and never be hardcoded: `TOKEN` (Telegram bot token, no default value; exit if missing), `FIREBASE_SERVICE_ACCOUNT`, optionally `FIREBASE_DB_URL`, `RENDER_EXTERNAL_URL`.
+- Never log secrets. The webhook URL contains the bot token, so log only "Webhook successfully set".
 
 ## 2. Data model
 One record per report/day:
@@ -73,15 +75,26 @@ Flexbox bars. Height = minutes / max * 170px, min-height 3px, rounded top, gradi
 
 ## 9. Telegram bot (bot.js)
 Conversation-state machine per chat (with a processing lock and duplicate-message-ID cache), replies in Markdown, mixed Bangla-English (Banglish) tone.
-- `/start`: ask date (default today) -> start time -> user sends "add" to get an activity template (Client, Site code, Category, Activity details, Assigned by, Team / person) -> pastes the filled form, bot parses it (site code uppercased; defaults: category "Implementation", assigned by "MD Azmir Hossain", team "N/A") and confirms each activity -> user sends "end" -> asks end time -> calculates OT with the same 540-minute rule -> saves the full report to Firebase via REST (`PUT /reports/{id}.json`) in the exact same data model as the website -> sends a summary.
-- `/edit`: ask date, look up the report in Firebase (if not found, list available dates), then accept edit commands to change fields or remove activities by number.
+- `/start`: ask date (default today) -> start time -> user sends "add" to get an activity template (Client, Site code, Category, Activity details, Assigned by, Team / person) -> pastes the filled form, bot parses it (site code uppercased; defaults: category "Implementation", assigned by "MD Azmir Hossain", team "N/A") and confirms each activity -> user sends "end" -> asks end time -> calculates OT with the same 540-minute rule -> saves the full report with the Admin SDK (`db.ref('reports/'+id).set(report)`) in the exact same data model as the website -> sends a summary.
+- `/edit`: ask date, look up the report via the Admin SDK (`db.ref('reports').once('value')`; if not found, list available dates), then accept edit commands to change fields or remove activities by number.
 - `/cancel` at any time. Normalize time input (e.g. "9:00", "18"), accept dates like 27 Oct / 2026-10-27.
 - Express `GET /` health route, `POST /bot<TOKEN>` webhook route.
 
 ## 10. Security requirements
-- Firebase Realtime Database rules must require authentication for read/write (the bot should authenticate with a service account / Admin SDK or a secret, not an open DB).
-- No secrets in client or bot source; use env vars; add .gitignore.
+- `database.rules.json`: only authenticated users may read/write `/reports`, and each report must have `id`, `date`, `shift`:
+  ```json
+  { "rules": { "reports": {
+      ".read": "auth != null", ".write": "auth != null",
+      "$reportId": { ".validate": "newData.hasChildren(['id','date','shift'])" } } } }
+  ```
+  Rules are deployed separately from hosting with `firebase deploy --only database`. Verify with `curl https://<project>-default-rtdb.firebaseio.com/reports.json` -> `{"error":"Permission denied"}`.
+- No secrets in client or bot source; use env vars; `.gitignore` must contain `node_modules/`, `.env`, `.firebase/`.
+- Render: set `TOKEN` and `FIREBASE_SERVICE_ACCOUNT` under **Environment Variables** (not "Secret Files", which `process.env` cannot read).
+- Firebase Hosting must not publish server files. In `firebase.json` use `"public": "."` with `ignore`: `firebase.json`, `**/.*`, `**/node_modules/**`, `README.md`, `PROMPT.md`, `bot.js`, `package.json`, `package-lock.json`, `database.rules.json`. Verify `/bot.js` and `/PROMPT.md` are not served.
+- Headers: images `max-age=31536000`; css/js/html `no-cache` so deploys show up immediately.
+- GitHub Pages must be disabled (it would publish bot.js). Deploy only through the Firebase Hosting GitHub Action (`FirebaseExtended/action-hosting-deploy`, channel `live`).
+- If a token is ever pasted in chat, logs or commits, revoke it via @BotFather `/revoke` and set the new one in Render.
 - No innerHTML with unescaped user data.
 
 ## 11. Deliverables
-Complete index.html, style.css, app.js, bot.js, package.json, firebase.json, database.rules.json, and a short README with deploy steps (Firebase Hosting + Render env vars + setting the webhook).
+Complete index.html, style.css, app.js, bot.js, package.json (with `firebase-admin`), firebase.json, database.rules.json, .gitignore, `.github/workflows/firebase-hosting-merge.yml` (deploy on push to main), and a short README with deploy steps (Firebase Hosting + `firebase deploy --only database` + Render env vars + webhook). Hosting caching: `no-cache` for js/css/html.
