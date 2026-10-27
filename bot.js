@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const TOKEN = process.env.TOKEN || '8684300697:AAFMHJpvfLdROY7b7Xk0TWaxtYT6QVx2FmU';
+const TOKEN = process.env.TOKEN;
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL || 'https://infinite-v1-default-rtdb.firebaseio.com';
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://report-pro-m2b2.onrender.com';
 
