@@ -45,6 +45,15 @@ function fmtOT(m){
   if(h)return `${h} hrs`;
   return `${mm} mins`;
 }
+/* ---- Compact OT for chart labels: "11h 22m" (hours + real minutes, no decimals) ---- */
+function fmtOTShort(m){
+  m=Math.round(m||0);
+  if(m<=0)return '';
+  const h=Math.floor(m/60),mm=m%60;
+  if(h&&mm)return `${h}h ${String(mm).padStart(2,'0')}m`;
+  if(h)return `${h}h`;
+  return `${mm}m`;
+}
 /* ---- OT color class based on hours ---- */
 function otClass(mins){
   if(!mins||mins<=0)return 'ot-none';
@@ -503,7 +512,7 @@ function renderDashboard(){
   $('dashboardBars').innerHTML=monthly.map((m,i)=>{
     const isCur=year===curYear&&String(i+1).padStart(2,'0')===curMonth;
     return `<div class="bar-col" title="${esc(m.name)}: ${esc(fmtOT(m.mins))}">
-      <div class="bar-val">${m.mins?fmtOT(m.mins):''}</div>
+      <div class="bar-val">${fmtOTShort(m.mins)}</div>
       <div class="bar${isCur?' bar-current':''}" style="height:${Math.round(m.mins/max*170)}px"></div>
       <div class="bar-lbl">${esc(m.name.slice(0,3))}</div>
     </div>`;
@@ -554,7 +563,7 @@ function renderAnalytics(){
   $('bars').innerHTML=data.map((m,i)=>{
     const isCur=y===curYear&&String(i+1).padStart(2,'0')===curMonth;
     return `<div class="bar-col" title="${m.name}: ${esc(fmtOT(m.mins))}">
-      <div class="bar-val">${m.mins?fmtOT(m.mins):''}</div>
+      <div class="bar-val">${fmtOTShort(m.mins)}</div>
       <div class="bar${isCur?' bar-current':''}" style="height:${Math.round(m.mins/max*170)}px"></div>
       <div class="bar-lbl">${m.name.slice(0,3)}</div>
     </div>`;

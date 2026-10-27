@@ -554,3 +554,12 @@ table.data tbody tr:hover td{background:var(--surface-2)}
 @keyframes logoPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
 .brand-logo-img{animation:logoPulse 3.5s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.brand-logo-img{animation:none}}
+/* ---- Bar chart value labels: keep "11h 22m" readable on narrow screens ---- */
+.bar-val{letter-spacing:-0.2px;font-variant-numeric:tabular-nums}
+@media (max-width:720px){
+  .bars{gap:4px}
+  .bar-val{
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    font-size:10px;margin-bottom:6px;
+  }
+}
