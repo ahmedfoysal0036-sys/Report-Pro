@@ -7,8 +7,29 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.TOKEN;
+if (!TOKEN) { console.error('❌ TOKEN env var missing'); process.exit(1); }
 const FIREBASE_DB_URL = process.env.FIREBASE_DB_URL || 'https://infinite-v1-default-rtdb.firebaseio.com';
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://report-pro-m2b2.onrender.com';
+
+// ── Firebase Admin SDK (bypasses DB rules; rules stay locked for the public) ──
+const admin = require('firebase-admin');
+function loadServiceAccount() {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!raw) throw new Error('FIREBASE_SERVICE_ACCOUNT env var missing');
+  let txt = raw.trim();
+  if (!txt.startsWith('{')) txt = Buffer.from(txt, 'base64').toString('utf8'); // allow base64
+  return JSON.parse(txt);
+}
+let adminDb = null;
+try {
+  const sa = loadServiceAccount();
+  admin.initializeApp({ credential: admin.credential.cert(sa), databaseURL: FIREBASE_DB_URL });
+  adminDb = admin.database();
+  console.log(`🔐 Firebase Admin ready (project: ${sa.project_id})`);
+} catch (e) {
+  console.error('❌ Firebase Admin init failed:', e.message);
+}
+
 
 app.get('/', (req, res) => {
   res.send('🤖 Telegram Form-based AI Bot is Active and Running 24/7 via Webhook!');
@@ -34,7 +55,7 @@ const bot = new TelegramBot(TOKEN);
 // Set Telegram Webhook
 const webhookUrl = `${RENDER_URL.replace(/\/$/, '')}/bot${TOKEN}`;
 bot.setWebHook(webhookUrl).then(() => {
-  console.log(`🔗 Webhook successfully set`);
+  console.log('🔗 Webhook successfully set');
 }).catch(err => {
   console.error('❌ Failed to set webhook:', err.message);
 });
@@ -98,23 +119,18 @@ function calculateOT(startTime, endTime) {
   return `${mm} mins`;
 }
 
-// Firebase REST API Push/Update
+// Firebase save (Admin SDK)
 async function saveToFirebase(reportData) {
   const id = reportData.id || (Date.now().toString() + Math.floor(100 + Math.random() * 900));
   reportData.id = id;
   reportData.updatedAt = Date.now();
   reportData.schemaVersion = 5;
-
-  const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports/${id}.json`;
   try {
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reportData)
-    });
-    return response.ok ? reportData : null;
+    if (!adminDb) throw new Error('Firebase Admin not initialised');
+    await adminDb.ref(`reports/${id}`).set(reportData);
+    return reportData;
   } catch (err) {
-    console.error('❌ Firebase Error:', err);
+    console.error('❌ Firebase Error:', err.message);
     return null;
   }
 }
@@ -147,14 +163,10 @@ function toISODate(input) {
 
 // Fetch report by date from Firebase
 async function findReportByDate(targetDate) {
-  const url = `${FIREBASE_DB_URL.replace(/\/$/, '')}/reports.json`;
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      return { match: null, dates: [], error: `Firebase read failed (HTTP ${response.status}).` };
-    }
-
-    const data = await response.json();
+    if (!adminDb) throw new Error('Firebase Admin not initialised');
+    const snap = await adminDb.ref('reports').once('value');
+    const data = snap.val();
     if (!data) return { match: null, dates: [], error: null };
 
     const entries = Array.isArray(data) ? data.map((v, i) => [String(i), v]) : Object.entries(data);
