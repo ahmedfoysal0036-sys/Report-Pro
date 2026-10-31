@@ -563,3 +563,50 @@ table.data tbody tr:hover td{background:var(--surface-2)}
     font-size:10px;margin-bottom:6px;
   }
 }
+/* Personal finance, allowance, journey and attendance additions */
+.inline-check{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text-2);margin-top:8px}
+.inline-check input{width:auto}
+.holiday-duty-check{padding:7px 10px;border:1px solid var(--border);border-radius:10px;background:var(--warn-soft);width:max-content;max-width:100%}
+.payroll-hero{padding:18px;border-radius:14px;background:linear-gradient(135deg,var(--primary-soft),var(--cyan-soft));border:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
+.payroll-hero span{font-size:12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.payroll-hero strong{font-size:30px;line-height:1.2;color:var(--success);font-variant-numeric:tabular-nums}
+.payroll-hero small{color:var(--text-2);font-size:12px}
+.payroll-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.payroll-grid>div{padding:12px;border:1px solid var(--border);border-radius:11px;background:var(--surface-2);min-width:0}
+.payroll-grid small{display:block;font-size:11px;color:var(--muted);margin-bottom:4px}
+.payroll-grid b{font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.personal-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+.small-note{font-size:12px;line-height:1.55;margin:0;color:var(--muted)}
+.finance-list{display:grid;gap:8px;margin-top:8px}
+.finance-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--surface-2)}
+.finance-row>div{min-width:0;display:grid;gap:3px}
+.finance-row b{font-size:13px;overflow-wrap:anywhere}
+.finance-row small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal-weekday{text-align:center;font-size:11px;font-weight:800;color:var(--muted);padding:5px 0}
+.cal-cell{min-height:82px;padding:7px 6px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);display:flex;flex-direction:column;gap:4px;min-width:0}
+.cal-cell strong{font-size:13px}
+.cal-cell span{font-size:10px;line-height:1.2;color:var(--text-2);overflow-wrap:anywhere}
+.cal-cell i{font-style:normal;font-size:10px;font-weight:800;color:var(--success)}
+.cal-empty{border-color:transparent;background:transparent}
+.cal-day{background:var(--success-soft);border-color:color-mix(in srgb,var(--success) 35%,var(--border))}
+.cal-night{background:var(--primary-soft);border-color:color-mix(in srgb,var(--primary) 35%,var(--border))}
+.cal-off{background:var(--surface-3)}
+.cal-holiday{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,var(--border))}
+.cal-leave{background:var(--purple-soft);border-color:color-mix(in srgb,var(--purple) 30%,var(--border))}
+.cal-missing{background:var(--danger-soft);border-color:color-mix(in srgb,var(--danger) 40%,var(--border))}
+.calendar-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.calendar-legend span{display:inline-flex;align-items:center;gap:5px}
+.legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--muted)}
+.legend-dot.day{background:var(--success)}.legend-dot.night{background:var(--primary)}.legend-dot.off{background:var(--muted)}.legend-dot.leave{background:var(--purple)}.legend-dot.missing{background:var(--danger)}
+.weekday-picks{display:flex;gap:8px;flex-wrap:wrap}
+.weekday-picks label{display:flex;align-items:center;gap:6px;border:1px solid var(--border);padding:7px 10px;border-radius:9px;background:var(--surface-2);font-size:12px}
+.weekday-picks input{width:auto}
+@media(max-width:720px){
+  .payroll-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .personal-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cal-cell{min-height:68px;padding:5px 4px}
+  .cal-cell span{font-size:9px}
+  .bottom-nav-inner{overflow-x:auto;justify-content:space-between;gap:2px}
+  .bnav-btn{min-width:58px;padding:4px 7px}
+}

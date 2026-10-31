@@ -19,8 +19,8 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={
   get(k){try{return localStorage.getItem(k)}catch(e){return null}},
-  set(k,v){try{localStorage.setItem(k,v)}catch(e){}},
-  del(k){try{localStorage.removeItem(k)}catch(e){}}
+  set(k,v){try{localStorage.setItem(k,v);return localStorage.getItem(k)===String(v)}catch(e){console.error('Local storage write failed:',e);return false}},
+  del(k){try{localStorage.removeItem(k);return true}catch(e){console.error('Local storage delete failed:',e);return false}}
 };
 const parseJSON=(s,fb)=>{try{const v=JSON.parse(s);return v==null?fb:v}catch(e){return fb}};
 const todayStr=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*60000).toISOString().split('T')[0]};
@@ -81,7 +81,7 @@ let dirty=false, tab='dashboard', undoBuf=null, draftTimer=null;
 let currentUser=null, cloudStarted=false, firstCloudSnapshot=true, appInitialized=false;
 const selected=new Set();
 const PENDING_KEY='activity_tracker_pending_v1';
-const persistLocal=()=>store.set(DB_KEY,JSON.stringify(DB));
+const persistLocal=()=>{const raw=JSON.stringify(DB);return store.set(DB_KEY,raw)&&store.get(DB_KEY)===raw};
 const readPending=()=>parseJSON(store.get(PENDING_KEY),{});
 const writePending=q=>store.set(PENDING_KEY,JSON.stringify(q));
 
@@ -138,20 +138,34 @@ function applyCloud(val){
     firstCloudSnapshot=false;
     const localRows=parseJSON(store.get(DB_KEY),[]);
     if(!cloudRows.length&&localRows.length){
-      DB=localRows.filter(Boolean).map(normalize).sort(byDate);persistLocal();
-      const q=readPending();DB.forEach(r=>{q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2}});writePending(q);
-      flushPending().then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
-      refreshData();toast('Cloud was empty. Existing local reports are being preserved and uploaded.','warn');return;
+      const previous=DB;
+      DB=localRows.filter(Boolean).map(normalize).sort(byDate);
+      if(!persistLocal()){DB=previous;setSync('error');toast('Local report storage is full; previous data was preserved. Export a backup before retrying.','error');return;}
+      // Cloud is empty, so add each local report without replacing the /reports root.
+      dbRef.update(rowsObject(DB)).then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
+      refreshData();toast('Cloud was empty. Existing local reports are being uploaded safely.','warn');return;
     }
-    DB=mergeInitialRows(localRows,cloudRows);persistLocal();refreshData();
+    const previous=DB;
+    DB=mergeInitialRows(localRows,cloudRows);
+    if(!persistLocal()){DB=previous;setSync('error');toast('Cloud data could not be saved locally. Existing local data was kept.','error');return}
+    refreshData();
     const merged=rowsObject(DB);
-    if(JSON.stringify(merged)!==JSON.stringify(val||{}))dbRef.set(merged).then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
+    // Update only known report keys. Never replace the entire /reports branch:
+    // another device may have added a record after this snapshot was read.
+    if(JSON.stringify(merged)!==JSON.stringify(val||{}))dbRef.update(merged).then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
     else setSync('online');
     return;
   }
   const pending=readPending();
-  if(Object.keys(pending).length){DB=mergeInitialRows(DB,cloudRows);persistLocal();refreshData();setSync('pending');return}
-  DB=cloudRows.sort(byDate);persistLocal();refreshData();
+  if(Object.keys(pending).length){
+    const previous=DB;DB=mergeInitialRows(DB,cloudRows);
+    if(!persistLocal()){DB=previous;setSync('error');toast('Could not store the cloud snapshot locally; existing data was kept.','error');return;}
+    refreshData();setSync('pending');return;
+  }
+  const previous=DB;
+  DB=cloudRows.sort(byDate);
+  if(!persistLocal()){DB=previous;setSync('error');toast('Cloud update could not be stored on this device. Existing local data was kept.','error');return}
+  refreshData();
 }
 function stopCloud(){
   if(dbRef)dbRef.off('value');
@@ -164,7 +178,7 @@ function startCloud(){
   dbRef.on('value',s=>applyCloud(s.val()),err=>{console.warn(err);setSync('error')});
   firebase.database().ref('.info/connected').on('value',async s=>{
     if(s.val())try{await flushPending();setSync('online')}catch(e){console.warn(e);setSync('error')}
-    else setSync('offline');
+    else {firstCloudSnapshot=true;setSync('offline')}
   });
 }
 
@@ -199,7 +213,8 @@ document.addEventListener('mousemove',e=>{
 /* ---- Tab switching with page transition ---- */
 function showTab(t){
   tab=t;
-  ['dashboard','report','history','analytics'].forEach(n=>{
+  ['dashboard','report','history','analytics','calendar','money'].forEach(n=>{
+
     const el=$('view-'+n);if(!el)return;
     const active=n===t;
     el.hidden=!active;
@@ -212,6 +227,8 @@ function showTab(t){
   if(t==='dashboard')initDashboardYears();
   if(t==='history')renderHistory();
   if(t==='analytics')initYears();
+  if(t==='calendar'&&window.renderPersonalCalendar)window.renderPersonalCalendar();
+  if(t==='money'&&window.renderPersonalMoney)window.renderPersonalMoney();
   window.scrollTo(0,0);
 }
 function applyTheme(t){
@@ -283,6 +300,8 @@ function readRows(){
 function syncShiftUI(){
   const off=$('shiftOff').checked;
   $('offType').hidden=!off;
+  const holidayBox=$('governmentHolidayDuty');
+  if(holidayBox){holidayBox.disabled=off;if(off)holidayBox.checked=false}
   $('startTime').disabled=off;$('endTime').disabled=off;
   if(off){$('startTime').value='00:00';$('endTime').value='00:00'}
   else if(!$('startTime').value||$('startTime').value==='00:00'){$('startTime').value='09:00';$('endTime').value='18:00'}
@@ -321,7 +340,9 @@ function getFormData(){
     assigned:$('assignedBy').value.trim(),
     name:$('userName').value.trim(),
     desig:$('userDesig').value.trim(),
-    shift,rows:readRows()
+    shift,rows:readRows(),
+    governmentHolidayDuty:!off&&$('governmentHolidayDuty')?$('governmentHolidayDuty').checked:false,
+    holidayAllowance:!off&&$('governmentHolidayDuty')&&$('governmentHolidayDuty').checked?900:0
   };
 }
 function resetFields(){
@@ -341,6 +362,7 @@ function loadForm(d,min){
   if(d.hr)$('hrId').value=d.hr;
   if(d.desig)$('userDesig').value=d.desig;
   applyShift(d.shift);
+  if($('governmentHolidayDuty'))$('governmentHolidayDuty').checked=!$('shiftOff').checked&&!!(d.governmentHolidayDuty||d.holidayDuty);
   if(!$('shiftOff').checked){
     if(d.startTime)$('startTime').value=d.startTime;
     if(d.endTime)$('endTime').value=d.endTime;
@@ -367,11 +389,22 @@ async function saveData(){
   if(clash){if(!confirm(`A report for ${data.date} already exists. Replace it?`))return;data.id=clash.id}
   data.updatedAt=Date.now();data.updatedBy=currentUser?currentUser.uid:'local';data.schemaVersion=2;
   showLoader('Saving…');
+  data.governmentHolidayDuty=!!data.governmentHolidayDuty;
+  data.holidayAllowance=data.governmentHolidayDuty?900:0;
+  const before=DB.slice();
   const i=DB.findIndex(r=>r.id===data.id);
   if(i>=0)DB[i]=data;else DB.push(data);
-  DB.sort(byDate);persistLocal();
+  DB.sort(byDate);
+  if(!persistLocal()){DB=before;hideLoader();toast('Could not save to device storage. Your previous report was kept; free storage or export a backup, then retry.','error');return}
   $('editingId').value=data.id;setDirty(false);store.del(DRAFT_KEY);
-  const q=readPending();q[String(data.id)]=data;writePending(q);
+  const q=readPending();q[String(data.id)]=data;
+  if(!writePending(q)){
+    if(dbRef&&currentUser){
+      try{await Promise.race([dbRef.child(String(data.id)).set(data),timeout(10000,'Cloud write timed out')]);setSync('online');toast('Report saved and synced directly; local queue storage was full.','success');}
+      catch(e){setSync('pending');toast('Report is saved locally. Cloud sync is pending; free browser storage and reconnect before switching devices.','warn');}
+    } else {setSync('offline');toast('Report saved locally. Cloud queue storage is full; free device storage and sync before switching devices.','warn');}
+    hideLoader();refreshData();return;
+  }
   if(!dbRef||!currentUser){hideLoader();setSync('offline');toast('Saved locally. Sign in to sync.','warn');return}
   try{await Promise.race([flushPending(),timeout(10000,'Cloud write timed out')]);toast('Report saved and synced','success')}
   catch(e){setSync('pending');toast('Saved on this device. Cloud sync pending.','warn')}
@@ -379,20 +412,28 @@ async function saveData(){
 }
 function deleteRecords(ids){
   const recs=DB.filter(r=>ids.includes(r.id));if(!recs.length)return;
-  DB=DB.filter(r=>!ids.includes(r.id));persistLocal();
+  const before=DB.slice();
+  DB=DB.filter(r=>!ids.includes(r.id));
+  if(!persistLocal()){DB=before;toast('Delete cancelled: device storage could not be updated.','error');return}
   ids.forEach(id=>selected.delete(id));
   if(ids.includes($('editingId').value))$('editingId').value='';
-  const q=readPending();ids.forEach(id=>q[String(id)]=null);writePending(q);
-  if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error')});
+  const q=readPending();ids.forEach(id=>q[String(id)]=null);
+  if(!writePending(q)){
+    if(dbRef&&currentUser)ids.forEach(id=>dbRef.child(String(id)).remove().catch(e=>{console.warn(e);setSync('error')}));
+    else toast('Deleted locally, but delete queue could not be saved. Sync before using another device.','warn');
+  } else if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error')});
   undoBuf=recs;refreshData();
   toast(`${recs.length} report${recs.length>1?'s':''} deleted`,'info',{label:'Undo',fn:undoDelete});
 }
 function undoDelete(){
   if(!undoBuf)return;
+  const before=DB.slice();
   undoBuf.forEach(r=>{if(!DB.some(x=>x.id===r.id))DB.push(r)});
-  DB.sort(byDate);persistLocal();
-  const q=readPending();undoBuf.forEach(r=>q[String(r.id)]={...r,updatedAt:Date.now(),updatedBy:currentUser?currentUser.uid:'local',schemaVersion:2});writePending(q);
-  if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error')});
+  DB.sort(byDate);
+  if(!persistLocal()){DB=before;toast('Undo could not be saved. The deleted state remains unchanged on this device.','error');return}
+  const q=readPending();undoBuf.forEach(r=>q[String(r.id)]={...r,updatedAt:Date.now(),updatedBy:currentUser?currentUser.uid:'local',schemaVersion:2});
+  if(!writePending(q)){if(dbRef&&currentUser)DB.forEach(r=>dbRef.child(String(r.id)).set(r).catch(e=>{console.warn(e);setSync('error')}));else toast('Restored locally, but cloud queue could not be saved. Sync before using another device.','warn');}
+  else if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error')});
   undoBuf=null;refreshData();toast('Reports restored','success');
 }
 
@@ -581,6 +622,8 @@ function refreshData(){
   if(tab==='dashboard')renderDashboard();
   if(tab==='history')renderHistory();
   if(tab==='analytics')renderAnalytics();
+  window.dispatchEvent(new CustomEvent('activity-data-updated'));
+  if(window.renderPersonalDashboard)window.renderPersonalDashboard();
 }
 
 /* ---------- Report paper (print + PDF) ---------- */
@@ -660,8 +703,10 @@ function exportExcel(){
   XLSX.writeFile(wb,`Dhanmondi_SC_Report_${todayStr()}.xlsx`);
 }
 function exportJSON(){
-  download(new Blob([JSON.stringify(DB,null,1)],{type:'application/json'}),`activity_backup_${todayStr()}.json`);
-  toast(`Backed up ${DB.length} reports`,'success');
+  const financePayload=window.exportPersonalFinanceBackup?window.exportPersonalFinanceBackup():parseJSON(store.get('personal_finance_v1'),null);
+  const bundle={backupType:'activity-tracker-full-backup',backupVersion:2,createdAt:new Date().toISOString(),reports:DB,personalFinance:financePayload};
+  download(new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}),`activity_backup_${todayStr()}.json`);
+  toast(`Backed up ${DB.length} reports${bundle.personalFinance?' plus personal finance records':''}`,'success');
 }
 function normDate(v){
   if(typeof v==='number')return new Date(Math.round((v-25569)*86400000)).toISOString().split('T')[0];
@@ -670,6 +715,7 @@ function normDate(v){
 }
 async function importRecords(list){
   const updates={};let n=0,seq=0;
+  const before=DB.slice();
   list.forEach(raw=>{
     if(!raw||!raw.date)return;
     const r=normalize(JSON.parse(JSON.stringify(raw)));
@@ -681,8 +727,16 @@ async function importRecords(list){
     if(i>=0)DB[i]=r;else DB.push(r);
     updates[id]=r;n++;
   });
-  DB.sort(byDate);persistLocal();refreshData();
-  if(dbRef&&n){try{await Promise.race([dbRef.update(updates),timeout(15000)])}catch(e){toast('Imported locally. Cloud sync pending.','warn')}}
+  DB.sort(byDate);
+  if(!persistLocal()){DB=before;toast('Restore cancelled: could not write the restored reports to device storage. Existing data was retained.','error');return 0}
+  refreshData();
+  if(dbRef&&currentUser&&n){
+    const q=readPending();Object.entries(updates).forEach(([id,r])=>q[id]=r);
+    try{
+      if(writePending(q))await Promise.race([flushPending(),timeout(15000)]);
+      else await Promise.race([dbRef.update(updates),timeout(15000)]);
+    }catch(e){toast('Reports restored locally; cloud sync is pending. Use Sync from cloud when online.','warn')}
+  }
   return n;
 }
 function recordsFromSheet(rows){
@@ -708,11 +762,17 @@ function handleRestore(e){
   reader.onload=async ev=>{
     try{
       let list;
-      if(isJson){list=parseJSON(ev.target.result,null);if(!Array.isArray(list))throw new Error('Invalid backup file')}
-      else{const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});list=recordsFromSheet(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}))}
-      if(!list.length)throw new Error('No reports found in this file');
-      const n=await importRecords(list);
-      toast(`Restored ${n} report${n===1?'':'s'}`,'success');showTab('history');
+      let financePayload=null;
+      if(isJson){
+        const parsed=parseJSON(ev.target.result,null);
+        if(Array.isArray(parsed))list=parsed; // legacy report-only backups remain supported
+        else if(parsed&&Array.isArray(parsed.reports)){list=parsed.reports;financePayload=parsed.personalFinance||null}
+        else throw new Error('Invalid backup file');
+      } else {const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});list=recordsFromSheet(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false}))}
+      if(!list.length&&!financePayload)throw new Error('No reports or finance records found in this file');
+      const n=list.length?await importRecords(list):0;
+      if(financePayload&&window.importPersonalFinanceBackup){const financeOk=window.importPersonalFinanceBackup(financePayload);if(!financeOk)toast('Reports restored, but personal finance records could not be stored. Export current data and check device storage.','warn')}
+      toast(`Restored ${n} report${n===1?'':'s'}${financePayload?' and personal finance records':''}`,'success');showTab(n?'history':'money');
     }catch(err){toast('Restore failed: '+err.message,'error')}
     hideLoader();
   };
@@ -726,8 +786,16 @@ async function syncNow(){
     const snap=await Promise.race([dbRef.once('value'),timeout(10000,'Cloud request timed out')]);
     const cloud=snap.val()?Object.values(snap.val()).filter(Boolean).map(normalize):[];
     const local=parseJSON(store.get(DB_KEY),[]);
-    if(!cloud.length&&local.length){const q=readPending();local.forEach(r=>q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2});writePending(q);await flushPending()}
-    else{DB=mergeInitialRows(local,cloud);persistLocal();await dbRef.set(rowsObject(DB))}
+    if(!cloud.length&&local.length){
+      const q=readPending();local.forEach(r=>q[String(r.id)]={...r,updatedAt:r.updatedAt||Date.now(),updatedBy:currentUser.uid,schemaVersion:2});
+      if(writePending(q))await flushPending();else await dbRef.update(rowsObject(local));
+    }
+    else{
+      const before=DB;
+      DB=mergeInitialRows(local,cloud);
+      if(!persistLocal()){DB=before;throw new Error('Local storage write failed; existing local reports retained')}
+      await dbRef.update(rowsObject(DB));
+    }
     refreshData();setSync('online');toast(`Sync complete: ${DB.length} reports`,'success');
   }catch(e){console.warn(e);setSync('error');toast('Sync failed. Local reports preserved.','warn')}
   hideLoader();
@@ -796,11 +864,14 @@ function init(){
 }
 function showAuthError(message){$('authError').textContent=message||''}
 function bootAuthenticatedUser(user){
-  currentUser=user;$('authGate').hidden=true;$('app').hidden=false;
+  currentUser=user;
+  window.currentActivityUid=user.uid;
+  window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:user.uid}}));
+  $('authGate').hidden=true;$('app').hidden=false;
   $('currentUser').textContent=user.email||user.uid;$('currentUser').title=user.email||user.uid;
   if(appInitialized)startCloud();else init();
 }
-function bootSignedOut(){stopCloud();currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
+function bootSignedOut(){stopCloud();window.currentActivityUid=null;window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:null}}));currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();showAuthError('');
   if(!firebaseReady||!auth){showAuthError('Setup required: configure Firebase and enable Email/Password sign-in.');return}
