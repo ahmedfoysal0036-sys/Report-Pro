@@ -67,52 +67,59 @@ app.post(`/bot${TOKEN}`, (req, res) => {
   res.sendStatus(200);
 });
 
-// Cache processed message IDs & Active Chat Locks
+// Duplicate protection, per-chat message queue and explicit Telegram allowlist.
 const processedMsgIds = new Set();
 const processingChats = new Set();
+const messageQueues = new Map();
+const allowedTelegramUsers = new Set(
+  String(process.env.ALLOWED_TELEGRAM_USER_IDS || '').split(',').map(v => v.trim()).filter(Boolean)
+);
+if (!allowedTelegramUsers.size) {
+  console.error('❌ ALLOWED_TELEGRAM_USER_IDS is empty. Bot commands are locked until an authorised Telegram user ID is configured.');
+}
 
 // Active user report & edit frames
 const activeFrames = {};
 const editFrames = {};
 
 // Helper: Today date string (YYYY-MM-DD)
-const todayStr = () => {
-  const d = new Date();
-  return new Date(d - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-};
+const todayStr = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Dhaka', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date());
 
-// Helper: Normalize Time to 24-Hour "HH:mm" Format
+// Helper: Strictly normalize valid 12-hour / 24-hour times to "HH:mm".
 function normalizeTime(timeInput) {
-  if (!timeInput) return '09:00';
-  let str = timeInput.trim().toUpperCase();
-  
-  const isPM = str.includes('PM');
-  const isAM = str.includes('AM');
-  str = str.replace(/(AM|PM)/g, '').trim();
-
-  let [hours, minutes] = str.split(':').map(Number);
-  if (isNaN(hours)) hours = 9;
-  if (isNaN(minutes)) minutes = 0;
-
-  if (isPM && hours < 12) hours += 12;
-  if (isAM && hours === 12) hours = 0;
-
-  const hh = String(hours).padStart(2, '0');
-  const mm = String(minutes).padStart(2, '0');
-  return `${hh}:${mm}`;
+  if (timeInput === undefined || timeInput === null) return '';
+  let str = String(timeInput).trim().toUpperCase();
+  if (!str) return '';
+  const suffix = (str.match(/(AM|PM)$/) || [])[1] || '';
+  if (suffix) str = str.slice(0, -2).trim();
+  const match = str.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+  if (!match) return '';
+  let hours = Number(match[1]);
+  const minutes = match[2] === undefined ? 0 : Number(match[2]);
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 59) return '';
+  if (suffix) {
+    if (hours < 1 || hours > 12) return '';
+    if (suffix === 'PM' && hours < 12) hours += 12;
+    if (suffix === 'AM' && hours === 12) hours = 0;
+  } else if (hours < 0 || hours > 23) return '';
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-// Helper: Overtime Calculation (9 Hours Basic Duty = 540 Mins)
+// Match website rule: 9-hour basic duty; reject zero or over-24-hour intervals.
 function calculateOT(startTime, endTime) {
-  if (!startTime || !endTime) return '0 hrs';
+  const valid = value => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''));
+  if (!valid(startTime) || !valid(endTime)) return 'Check shift time';
   const [sh, sm] = startTime.split(':').map(Number);
   const [eh, em] = endTime.split(':').map(Number);
   const startMins = sh * 60 + sm;
   let endMins = eh * 60 + em;
   if (endMins < startMins) endMins += 1440;
   const duration = endMins - startMins;
+  if (duration <= 0 || duration > 1440) return 'Check shift time';
   const otMins = Math.max(0, duration - 540);
-  
+  if (otMins === 0) return '0 hrs';
   const h = Math.floor(otMins / 60);
   const mm = otMins % 60;
   if (h && mm) return `${h} hrs ${mm} mins`;
@@ -257,18 +264,34 @@ function parseEditMessage(text) {
   return result;
 }
 
-// Telegram Message Listener with Chat-Level Concurrency Lock
-bot.on('message', async (msg) => {
+// Queue updates by chat so a quick second message is not silently discarded.
+bot.on('message', (msg) => {
+  const chatKey = String(msg.chat && msg.chat.id || 'unknown');
+  const previous = messageQueues.get(chatKey) || Promise.resolve();
+  const current = previous.catch(() => {}).then(() => handleIncomingMessage(msg)).catch(err => {
+    console.error('❌ Queued Telegram update failed:', err.message);
+  });
+  messageQueues.set(chatKey, current);
+  current.finally(() => { if (messageQueues.get(chatKey) === current) messageQueues.delete(chatKey); });
+});
+
+async function handleIncomingMessage(msg) {
   const chatId = msg.chat.id;
   const msgId = msg.message_id;
+  const duplicateKey = `${chatId}:${msgId}`;
+  if (processedMsgIds.has(duplicateKey)) return;
+  processedMsgIds.add(duplicateKey);
+  if (processedMsgIds.size > 1000) processedMsgIds.delete(processedMsgIds.values().next().value);
 
-  if (processedMsgIds.has(msgId)) return;
-  processedMsgIds.add(msgId);
-  if (processedMsgIds.size > 200) processedMsgIds.clear();
+  const telegramUserId = String(msg.from && msg.from.id || '');
+  if (!allowedTelegramUsers.has(telegramUserId)) {
+    const idHint = telegramUserId ? ` Your Telegram user ID is: ${telegramUserId}.` : '';
+    await bot.sendMessage(chatId, `⛔ Access denied. This personal bot is restricted to authorised users.${idHint} Ask the owner to add this ID to ALLOWED_TELEGRAM_USER_IDS on the server.`);
+    return;
+  }
 
   if (processingChats.has(chatId)) return;
   processingChats.add(chatId);
-
   try {
     const text = (msg.text || '').trim();
     if (!text) return;
@@ -432,7 +455,12 @@ bot.on('message', async (msg) => {
 
     // 6. SET START TIME (FROM)
     if (frame.step === 'WAITING_FOR_START_TIME') {
-      frame.startTime = normalizeTime(text);
+      const normalizedStart = normalizeTime(text);
+      if (!normalizedStart) {
+        await bot.sendMessage(chatId, '⚠️ Invalid start time. Use HH:mm (e.g. 09:00 or 9 PM).');
+        return;
+      }
+      frame.startTime = normalizedStart;
       frame.step = 'READY_FOR_ACTIVITY';
 
       await bot.sendMessage(chatId, `✅ *Start Time Set: ${frame.startTime}*\n\nAro activity jog korte template puron kore pathan ba *"add"* command din.\n\n*Activity Format:*\nClient: \nSite code: \nCategory: \nActivity details: \nAssigned by: \nTeam / person: `, { parse_mode: 'Markdown' });
@@ -482,8 +510,17 @@ bot.on('message', async (msg) => {
 
     // 10. SET END TIME (TO) & SAVE TO FIREBASE
     if (frame.step === 'WAITING_FOR_END_TIME') {
-      frame.endTime = normalizeTime(text);
+      const normalizedEnd = normalizeTime(text);
+      if (!normalizedEnd) {
+        await bot.sendMessage(chatId, '⚠️ Invalid end time. Use HH:mm (e.g. 18:00 or 11 PM).');
+        return;
+      }
+      frame.endTime = normalizedEnd;
       const totalOT = calculateOT(frame.startTime, frame.endTime);
+      if (totalOT === 'Check shift time') {
+        await bot.sendMessage(chatId, '⚠️ This shift duration is invalid (must be greater than 0 and no more than 24 hours). Please enter the end time again.');
+        return;
+      }
       const mainAssigned = frame.rows[0]?.ab || 'MD Azmir Hossain';
 
       const finalReport = {
@@ -497,6 +534,8 @@ bot.on('message', async (msg) => {
         name: 'S.M.Faisal Ahmed',
         desig: 'Sr Supervisor',
         shift: 'DAY',
+        governmentHolidayDuty: false,
+        holidayAllowance: 0,
         rows: frame.rows
       };
 
@@ -519,7 +558,7 @@ bot.on('message', async (msg) => {
   } finally {
     processingChats.delete(chatId);
   }
-});
+}
 
 // ── Keep-alive self-ping (prevents Render free-tier sleep) ──────────────────
 // Pings our own health endpoint every 13 minutes so Render never idles out.

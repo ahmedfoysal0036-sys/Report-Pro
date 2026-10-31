@@ -53,6 +53,8 @@
         <button role="tab" data-act="tab" data-tab="report"    aria-selected="true">Report</button>
         <button role="tab" data-act="tab" data-tab="history"   aria-selected="false">History</button>
         <button role="tab" data-act="tab" data-tab="analytics" aria-selected="false">Analytics</button>
+        <button role="tab" data-act="tab" data-tab="calendar" aria-selected="false">Calendar</button>
+        <button role="tab" data-act="tab" data-tab="money" aria-selected="false">Money</button>
       </nav>
 
       <div class="spacer"></div>
@@ -98,6 +100,7 @@
         <h2 class="card-title">Monthly overtime</h2>
         <div class="bars" id="dashboardBars" role="img" aria-label="Monthly overtime overview"></div>
       </div>
+      <div id="personalDashboard" class="stack"></div>
       <div class="card stack">
         <h2 class="card-title">Recent reports</h2>
         <div class="tbl-wrap">
@@ -158,6 +161,7 @@
                       <option value="Casual leave">Casual leave</option>
                     </select>
                   </div>
+                  <label class="inline-check holiday-duty-check"><input type="checkbox" id="governmentHolidayDuty"> Government holiday duty (৳900 fixed allowance)</label>
                 </div>
               </div>
             </div>
@@ -221,6 +225,95 @@
       </div>
     </section>
 
+    <!-- ATTENDANCE CALENDAR -->
+    <section id="view-calendar" class="stack" hidden>
+      <div class="card stack">
+        <div class="toolbar">
+          <h2 class="card-title">Attendance &amp; Duty Calendar</h2><span class="spacer"></span>
+          <button class="btn btn-icon" id="calPrev" type="button" aria-label="Previous month">‹</button>
+          <input type="month" id="calMonth" aria-label="Calendar month" style="max-width:160px">
+          <button class="btn btn-icon" id="calNext" type="button" aria-label="Next month">›</button>
+        </div>
+        <div class="stats" id="calendarSummary"></div>
+        <div class="calendar-grid" id="calendarGrid" aria-label="Monthly duty calendar"></div>
+        <p id="missingDates" class="muted small-note"></p>
+        <div class="calendar-legend">
+          <span><i class="legend-dot day"></i>Day</span><span><i class="legend-dot night"></i>Night</span><span><i class="legend-dot off"></i>Off</span><span><i class="legend-dot leave"></i>Leave</span><span><i class="legend-dot missing"></i>Missing report</span>
+        </div>
+      </div>
+      <div class="card stack">
+        <h2 class="card-title">Expected duty weekdays</h2>
+        <p class="muted small-note">Select your normal workdays. Only selected weekdays without a saved report will be flagged as Missing. No work schedule is assumed by default.</p>
+        <div class="weekday-picks" id="expectedWeekdays">
+          <label><input type="checkbox" value="0"> Sunday</label><label><input type="checkbox" value="1"> Monday</label><label><input type="checkbox" value="2"> Tuesday</label><label><input type="checkbox" value="3"> Wednesday</label><label><input type="checkbox" value="4"> Thursday</label><label><input type="checkbox" value="5"> Friday</label><label><input type="checkbox" value="6"> Saturday</label>
+        </div>
+      </div>
+    </section>
+
+    <!-- PERSONAL FINANCE, ALLOWANCE, EXPENSE & JOURNEY -->
+    <section id="view-money" class="stack" hidden>
+      <div class="card stack">
+        <div class="toolbar"><h2 class="card-title">Salary &amp; OT Payout</h2><span class="spacer"></span><button class="btn btn-icon" id="moneyPrev" type="button" aria-label="Previous salary month">‹</button><input type="month" id="moneyMonth" aria-label="Salary month" style="max-width:160px"><button class="btn btn-icon" id="moneyNext" type="button" aria-label="Next salary month">›</button></div>
+        <div id="moneyPayoutSummary"></div>
+        <p id="financeSyncStatus" class="muted small-note">Finance data is stored separately from daily reports.</p>
+      </div>
+      <div class="card stack">
+        <h2 class="card-title">Appraisal &amp; Rate History</h2>
+        <p class="muted small-note">Add a new effective date after appraisal. Salary and hourly OT rate are both versioned; previous work-month OT retains its historic rate. Salary is not prorated for a mid-month appraisal.</p>
+        <form id="profileForm" class="grid g3">
+          <div class="field"><label for="profileDate">Effective from</label><input id="profileDate" name="effectiveFrom" type="date" required></div>
+          <div class="field"><label for="profileSalary">Monthly salary (৳)</label><input id="profileSalary" name="salary" type="number" min="0" step="0.01" placeholder="Enter salary" required></div>
+          <div class="field"><label for="profileOtRate">OT rate / hour (৳)</label><input id="profileOtRate" name="otRate" type="number" min="0" step="0.01" value="235" required></div>
+          <div class="field"><button class="btn btn-primary" type="submit">Save appraisal rate</button></div>
+        </form>
+        <div id="profileList" class="finance-list"></div>
+      </div>
+      <div class="card stack">
+        <h2 class="card-title">Food Allowance &amp; Online Bill Reference</h2>
+        <p class="muted small-note">Manual entry for out-of-Dhaka travel (100 km or more). Allowance can be entered whenever received or submitted. Use Reference No. to track the online bill.</p>
+        <form id="allowanceForm" class="grid g3">
+          <div class="field"><label for="allowanceDate">Date</label><input id="allowanceDate" name="date" type="date" required></div>
+          <div class="field"><label>Location</label><input name="location" placeholder="Where did you travel?"></div>
+          <div class="field"><label>Distance (KM)</label><input name="distanceKm" type="number" min="0" step="0.1" placeholder="100 or more"></div>
+          <div class="field"><label>Allowance amount (৳)</label><input name="amount" type="number" min="0.01" step="0.01" required></div>
+          <div class="field"><label>Online bill Reference No.</label><input name="referenceNo" placeholder="Bill / reference number"></div>
+          <div class="field"><label>Status</label><select name="status"><option value="pending">Pending</option><option value="submitted">Submitted</option><option value="paid">Paid / Received</option></select></div>
+          <div class="field"><label>Remarks</label><input name="remarks" placeholder="Optional notes"></div>
+          <div class="field"><button class="btn btn-primary" type="submit">Add food allowance</button></div>
+        </form>
+        <div id="allowanceList" class="finance-list"></div>
+      </div>
+      <div class="card stack">
+        <h2 class="card-title">Food Expense</h2>
+        <p class="muted small-note">Food expenses are separate from Food Allowance and reduce the net balance; they are never counted as income.</p>
+        <form id="expenseForm" class="grid g3">
+          <div class="field"><label for="expenseDate">Date</label><input id="expenseDate" name="date" type="date" required></div>
+          <div class="field"><label>Amount (৳)</label><input name="amount" type="number" min="0.01" step="0.01" required></div>
+          <div class="field"><label>Location</label><input name="location" placeholder="Location"></div>
+          <div class="field"><label>Food details</label><input name="details" placeholder="Meal / food details"></div>
+          <div class="field"><label>Remarks</label><input name="remarks" placeholder="Optional notes"></div>
+          <div class="field"><button class="btn btn-primary" type="submit">Add food expense</button></div>
+        </form>
+        <div id="expenseList" class="finance-list"></div>
+      </div>
+      <div class="card stack">
+        <h2 class="card-title">Daily Journey Log</h2>
+        <p class="muted small-note">Record each movement. You can add multiple journeys on the same day.</p>
+        <form id="journeyForm" class="grid g3">
+          <div class="field"><label for="journeyDate">Journey date</label><input id="journeyDate" name="date" type="date" required></div>
+          <div class="field"><label>From</label><input name="from" required placeholder="Starting location"></div>
+          <div class="field"><label>To</label><input name="to" required placeholder="Destination"></div>
+          <div class="field"><label>Client / Site</label><input name="client" placeholder="Client or site name"></div>
+          <div class="field"><label>Distance (KM)</label><input name="distanceKm" type="number" min="0" step="0.1"></div>
+          <div class="field"><label>Purpose</label><input name="purpose" placeholder="Why did you travel?"></div>
+          <div class="field"><label>Transport</label><input name="transport" placeholder="Bus, CNG, car, etc."></div>
+          <div class="field"><label>Remarks</label><input name="remarks" placeholder="Optional notes"></div>
+          <div class="field"><button class="btn btn-primary" type="submit">Add journey</button></div>
+        </form>
+        <div id="journeyList" class="finance-list"></div>
+      </div>
+    </section>
+
   </main>
 
   <!-- Mobile bottom nav -->
@@ -244,12 +337,8 @@
         </span>
         History
       </button>
-      <button class="bnav-btn" data-act="tab" data-tab="analytics" aria-selected="false">
-        <span class="bnav-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        </span>
-        Analytics
-      </button>
+      <button class="bnav-btn" data-act="tab" data-tab="calendar" aria-selected="false"><span class="bnav-icon">▦</span>Calendar</button>
+      <button class="bnav-btn" data-act="tab" data-tab="money" aria-selected="false"><span class="bnav-icon">৳</span>Money</button>
     </div>
   </nav>
 
@@ -266,5 +355,6 @@
 <datalist id="dl-site"></datalist>
 
 <script src="app.js"></script>
+<script src="personal.js"></script>
 </body>
 </html>
