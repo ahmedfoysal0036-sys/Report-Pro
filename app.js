@@ -7,7 +7,7 @@ const DRAFT_KEY='activity_draft_v1';
 const DEFAULTS={assigned:'Md Azmir Hossain',name:'S.M.Faisal Ahmed',hr:'0036',desig:'Sr Supervisor'};
 const DUTY_MINUTES=540;
 const MAX_ROWS=20;
-const OFF_TYPES=['Weekly Holiday ','Goverment Holiday','Shifting','Sick Leave','Plan leave','Casual leave'];
+const OFF_TYPES=['Weekly Holiday','Goverment Holiday','Shifting','Duty Shifting','Sick Leave','Plan leave','Anual leave','Casual leave','Off day'];
 const ASSIGN=["MD Azmir Hossain","Md Zahidur Rahman","Md Mahbub Hossain","Ashik Ahmed Pial","Md Mahatab Uddin","Kamruzzaman Biswas","DS Nipun"];
 const TEAM=["MD Azmir Hossain","Md Zahidur Rahman","Md Mahbub Hossain","Ashik Ahmed Pial","Md Mahatab Uddin","DS Nipun","Kamruzzaman Biswas","Milon Chand","Mehedi Hasan Tuhin","Ranjit","Shihab","SM Sohel","Jaman","Nuruzzaman","Solaiman","Poran da","Alomgir","Alim","Khokon","Aziz","Mukter","Sumon STL","Selim STL","SA Team Member","Rejaul Karim","Street Fighers","Red Dragons","Night Riders","Raising Stars","Road Warriors","N/A"];
 const CLIENTS=["Grameen Phone Limited","Robi Axiata Limited","Banglalink Digital","Teletalk Bangladesh","SCOMM","SCOMM POP","SCOMM CO-POP","Robi Dark Fiber","Banglalink Dark Fiber","Info Phase-2","Info Phase-3","STL","CCL"];
@@ -233,7 +233,18 @@ function showTab(t){
 }
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);
-  $('themeBtn').textContent=t==='dark'?'💡':' 🌙 ';
+  const isDark=t==='dark';
+  const label=isDark?'Switch to light theme':'Switch to dark theme';
+  const icon=isDark
+    ?'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>'
+    :'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1110.5 3 7 7 0 0021 14.5z"/></svg>';
+  document.querySelectorAll('[data-act="theme"]').forEach(btn=>{
+    btn.setAttribute('aria-label',label);
+    btn.title=label;
+    btn.innerHTML=icon;
+  });
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.setAttribute('content',isDark?'#070b16':'#4f46e5');
 }
 
 /* ---------- Skeleton loaders ---------- */
@@ -311,7 +322,14 @@ function applyShift(shift){
   shift=shift||'DAY';
   const off=isOffShift(shift);
   $('shiftOff').checked=off;$('shiftNight').checked=shift==='NIGHT';$('shiftDay').checked=!off&&shift!=='NIGHT';
-  if(off)$('offType').value=OFF_TYPES.includes(shift)?shift:'Off day';
+  if(off){
+    const sel=$('offType');
+    const known=[...sel.options].some(o=>o.value===shift);
+    if(!known){
+      const opt=document.createElement('option');opt.value=shift;opt.textContent=label(shift);sel.appendChild(opt);
+    }
+    sel.value=shift||'Off day';
+  }
   syncShiftUI();
 }
 function calcOT(){
@@ -886,6 +904,7 @@ $('resetPasswordBtn').addEventListener('click',async()=>{
   try{await auth.sendPasswordResetEmail(email);showAuthError('Password reset email sent if the account exists.')}catch(err){showAuthError(err.message)}
 });
 $('signOutBtn').addEventListener('click',async()=>{if(dirty&&!confirmDiscard())return;try{await auth.signOut()}catch(err){toast('Could not sign out: '+err.message,'error')}});
+applyTheme(store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
 if(firebaseReady&&auth)auth.onAuthStateChanged(user=>{if(user)bootAuthenticatedUser(user);else bootSignedOut()});
 else{bootSignedOut();showAuthError('Setup required: configure Firebase and enable Email/Password sign-in in Firebase Console.')}
 })();
