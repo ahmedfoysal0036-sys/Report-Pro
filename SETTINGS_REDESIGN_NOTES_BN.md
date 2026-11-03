@@ -1,16 +1,8 @@
-# Report-Pro Settings Redesign
+# Report-Pro — Full Left Sidebar Redesign
 
-## কী পরিবর্তন হয়েছে
-- Desktop navigation-এ Settings section যোগ হয়েছে।
-- Settings-এর ভিতরে TP-Link router-এর মতো left sidebar এবং আলাদা content page যোগ হয়েছে।
-- General, Appearance, Data & Sync, Account & Security এবং System Information আলাদা পেজ।
-- Theme switch, JSON backup, restore, PDF/Excel export, print এবং manual cloud sync আগের app.js action ব্যবহার করে।
-- Mobile-এ Settings মূল bottom navigation-এ আছে; Settings-এর ভেতরের sub-navigation horizontal scroll করে।
-
-## Data safety
-- Existing report, finance, calendar, Firebase data model বা storage key পরিবর্তন করা হয়নি।
-- নতুন কোনো database write/schema migration যোগ করা হয়নি।
-- Account/security page কেবল বর্তমান authentication setup সম্পর্কে তথ্য দেখায়; Firebase rules পরিবর্তন করে না।
-
-## Deploy
-বর্তমান Hosting public directory-তে `index.html`, `style.css`, `app.js`, `personal.js` একসাথে আপলোড/ডিপ্লয় করুন। আগের live version এবং JSON backup রেখে তারপর deploy করুন।
+- পুরো অ্যাপের প্রধান নেভিগেশন এখন TP-Link router admin panel-এর মতো বাম পাশের স্থায়ী Sidebar-এ।
+- Dashboard, Report, History, Analytics, Calendar, Money এবং Settings আলাদা পেজ হিসেবে Sidebar থেকে খোলা যায়।
+- Settings-এর ভেতরে General, Appearance, Data & Sync, Account & Security এবং System Information আলাদা সাব-পেজ হিসেবে রাখা হয়েছে।
+- মোবাইলে Sidebar hamburger button দিয়ে off-canvas drawer হিসেবে খোলে।
+- বিদ্যমান রিপোর্ট/ফাইন্যান্স ডেটা মডেল, Firebase path, storage key এবং business logic ইচ্ছাকৃতভাবে পরিবর্তন করা হয়নি।
+- Deployment-এর আগে JSON backup নিন এবং GitHub Actions ও live Firebase-এ পরীক্ষা করুন।
