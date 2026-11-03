@@ -7,11 +7,11 @@ const DRAFT_KEY='activity_draft_v1';
 const DEFAULTS={assigned:'Md Azmir Hossain',name:'S.M.Faisal Ahmed',hr:'0036',desig:'Sr Supervisor'};
 const DUTY_MINUTES=540;
 const MAX_ROWS=20;
-const OFF_TYPES=['Off day','Goverment Holiday','Shifting','Sick Leave','Plan leave','Casual leave'];
+const OFF_TYPES=['Weekly Holiday ','Goverment Holiday','Shifting','Sick Leave','Plan leave','Casual leave'];
 const ASSIGN=["MD Azmir Hossain","Md Zahidur Rahman","Md Mahbub Hossain","Ashik Ahmed Pial","Md Mahatab Uddin","Kamruzzaman Biswas","DS Nipun"];
 const TEAM=["MD Azmir Hossain","Md Zahidur Rahman","Md Mahbub Hossain","Ashik Ahmed Pial","Md Mahatab Uddin","DS Nipun","Kamruzzaman Biswas","Milon Chand","Mehedi Hasan Tuhin","Ranjit","Shihab","SM Sohel","Jaman","Nuruzzaman","Solaiman","Poran da","Alomgir","Alim","Khokon","Aziz","Mukter","Sumon STL","Selim STL","SA Team Member","Rejaul Karim","Street Fighers","Red Dragons","Night Riders","Raising Stars","Road Warriors","N/A"];
 const CLIENTS=["Grameen Phone Limited","Robi Axiata Limited","Banglalink Digital","Teletalk Bangladesh","SCOMM","SCOMM POP","SCOMM CO-POP","Robi Dark Fiber","Banglalink Dark Fiber","Info Phase-2","Info Phase-3","STL","CCL"];
-const CATEGORIES=["BL Dark Fiber","Client Connectivity","Capacity upgrade","Device Change","Device Power Up","Device Upgrade","DWDM Activity","IMP Excel input","Implementation","Info POP PM","Interfacing","Key Related Support","Link Upgrade","Link Visit","Link down","Meeting","NCR Activity","New POP Installation","New Site Onair","ODF Installation","PAT","PM","POP Activity","QA Issue","ROBI Dark Fiber","Roster Support","SFP Dismantle","Site Down","Site Visit","Site Dismantle","STL Support","Survey","Team Mobilizing","Trouble Shooting","Vertical Activity"];
+const CATEGORIES=["BL Dark Fiber","Client Connectivity","Capacity upgrade","Device Change","Device Power Up","Device Upgrade","DWDM Activity","IMP Excel input","Implementation","Info POP PM","Interfacing","Key Related Support","Link Upgrade","Link Visit","Link down","Meeting","NCR Activity","New POP Installation","New Site Onair","ODF Installation","PAT","PM","POP Activity","QA Issue","ROBI Dark Fiber","Roster Support","SFP Dismantle","Site Down","Site Visit","Site Dismantle","STL Support","Survey","Team Mobilizing","Trouble Shooting","Vertical Activity","Others"];
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 /* ---------- Helpers ---------- */
@@ -233,7 +233,7 @@ function showTab(t){
 }
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);
-  $('themeBtn').textContent=t==='dark'?'☀':'☾';
+  $('themeBtn').textContent=t==='dark'?'💡':'⚫';
 }
 
 /* ---------- Skeleton loaders ---------- */
@@ -700,7 +700,7 @@ function exportExcel(){
   const ws=XLSX.utils.aoa_to_sheet(out);
   ws['!cols']=[5,12,16,9,9,12,22,14,20,50,20,20,20,8,20,16].map(wch=>({wch}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Activity Report');
-  XLSX.writeFile(wb,`Dhanmondi_SC_Report_${todayStr()}.xlsx`);
+  XLSX.writeFile(wb,`Activity_Backup_Report_${todayStr()}.xlsx`);
 }
 function exportJSON(){
   const financePayload=window.exportPersonalFinanceBackup?window.exportPersonalFinanceBackup():parseJSON(store.get('personal_finance_v1'),null);
