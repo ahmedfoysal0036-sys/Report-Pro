@@ -211,29 +211,9 @@ document.addEventListener('mousemove',e=>{
 });
 
 /* ---- Tab switching with page transition ---- */
-let activeSettingsPage='general';
-function showSettingsPage(page){
-  const allowed=['general','appearance','data','account','system'];
-  if(!allowed.includes(page))page='general';
-  activeSettingsPage=page;
-  document.querySelectorAll('[data-settings-view]').forEach(el=>{el.hidden=el.dataset.settingsView!==page});
-  document.querySelectorAll('[data-setting-page]').forEach(btn=>{
-    const active=btn.dataset.settingPage===page;
-    btn.classList.toggle('active',active);
-    if(active)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current');
-  });
-  const theme=document.documentElement.getAttribute('data-theme')||'light';
-  document.querySelectorAll('[data-theme-choice]').forEach(btn=>btn.classList.toggle('selected',btn.dataset.themeChoice===theme));
-  const themeStatus=$('settingsThemeStatus');
-  if(themeStatus)themeStatus.textContent='Current theme: '+(theme==='dark'?'Dark':'Light');
-  const syncPill=$('syncPill'),settingsSync=$('settingsSyncStatus');
-  if(syncPill&&settingsSync){settingsSync.className=syncPill.className;settingsSync.textContent=syncPill.textContent}
-  const email=$('currentUser'),accountEmail=$('settingsAccountEmail');
-  if(email&&accountEmail)accountEmail.textContent=email.textContent||'Signed-in user';
-}
 function showTab(t){
   tab=t;
-  ['dashboard','report','history','analytics','calendar','money','settings'].forEach(n=>{
+  ['dashboard','report','history','analytics','calendar','money'].forEach(n=>{
 
     const el=$('view-'+n);if(!el)return;
     const active=n===t;
@@ -249,12 +229,11 @@ function showTab(t){
   if(t==='analytics')initYears();
   if(t==='calendar'&&window.renderPersonalCalendar)window.renderPersonalCalendar();
   if(t==='money'&&window.renderPersonalMoney)window.renderPersonalMoney();
-  if(t==='settings')showSettingsPage(activeSettingsPage);
   window.scrollTo(0,0);
 }
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);
-  const themeBtn=$('themeBtn');if(themeBtn)themeBtn.textContent=t==='dark'?'💡':' 🌙 ';
+  $('themeBtn').textContent=t==='dark'?'💡':' 🌙 ';
 }
 
 /* ---------- Skeleton loaders ---------- */
@@ -841,17 +820,6 @@ const actions={
   'json-backup':exportJSON,restore:()=>$('restoreInput').click(),sync:syncNow,
   theme:()=>{const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';applyTheme(t);store.set('theme',t)}
 };
-document.addEventListener('click',e=>{
-  const pageBtn=e.target.closest('[data-setting-page]');
-  const jumpBtn=e.target.closest('[data-setting-jump]');
-  const themeBtn=e.target.closest('[data-theme-choice]');
-  if(pageBtn){showSettingsPage(pageBtn.dataset.settingPage);return}
-  if(jumpBtn){showSettingsPage(jumpBtn.dataset.settingJump);return}
-  if(themeBtn){
-    const theme=themeBtn.dataset.themeChoice;
-    applyTheme(theme);store.set('theme',theme);showSettingsPage('appearance');return;
-  }
-});
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
   if(b&&actions[b.dataset.act]){if(e.target.closest('#menu'))$('menu').open=false;actions[b.dataset.act](b,e);return}
