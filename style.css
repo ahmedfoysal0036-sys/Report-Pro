@@ -203,11 +203,22 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-vis
 .menu{position:relative}
 .menu-pop{
   position:absolute;right:0;top:calc(100% + 8px);min-width:220px;
-  background:var(--surface);border:1px solid var(--border);
+  max-width:calc(100vw - 24px); /* যাতে স্ক্রিনের বাইরে না যায় */
+  background:var(--surface);border:1.5px solid var(--border);
   border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:6px;z-index:40;
   animation:menuIn .18s cubic-bezier(.34,1.3,.64,1) both;
   transform-origin:top right;
 }
+
+/* মোবাইল স্ক্রিনের জন্য ড্রপডাউন পজিশন ফিক্স */
+@media (max-width: 720px) {
+  .menu-pop {
+    right: auto;
+    left: 0; /* মোবাইল স্ক্রিনে বাম দিক থেকে অ্যালাইন হবে যাতে কেটে না যায় */
+    transform-origin: top left;
+  }
+}
+
 @keyframes menuIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
 .menu-pop button{
   display:block;width:100%;text-align:left;font:inherit;font-size:13px;
