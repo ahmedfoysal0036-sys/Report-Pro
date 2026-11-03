@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e27">
+<meta name="description" content="Activity Tracker - Dhanmondi SC secure access">
+<title>Activity Tracker · Dhanmondi SC</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- AUTHENTICATION GATE -->
+<section id="authGate" class="auth-wrap" role="main" aria-label="Sign in">
+ <div class="auth-card">
+ <div class="brand" style="margin-bottom:20px">
+ <div class="auth-logo">RP</div>
+ <div>
+ <strong>REPORT-PRO</strong>
+ <small>Dhanmondi SC</small>
+ </div>
+ </div>
+ 
+ <h1>Secure Access</h1>
+ <p>Sign in with your authorised work account</p>
+ 
+ <form id="loginForm" class="auth-form" novalidate>
+ <div class="field">
+ <label for="loginEmail">Work email</label>
+ <input id="loginEmail" type="email" autocomplete="username" placeholder="your.name@dhanmondi.org" required aria-required="true" />
+ </div>
+ 
+ <div class="field">
+ <label for="loginPassword">Password</label>
+ <input id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••" required aria-required="true" />
+ </div>
+ 
+ <div class="auth-actions">
+ <button class="btn btn-primary" type="submit" id="loginBtn"><span>Sign in</span></button>
+ <button class="btn btn-ghost" type="button" id="resetPasswordBtn">Reset password</button>
+ </div>
+ 
+ <div id="authError" class="auth-error" role="alert" aria-live="polite"></div>
+ </form>
+ 
+ <div class="auth-footer">
+ <p>No public sign-up. An administrator must create accounts in Firebase Authentication.</p>
+ </div>
+ </div>
+</section>
+
+<!-- MAIN APPLICATION LAYOUT -->
+<div id="app" hidden>
+ <div class="app-layout">
+ <!-- SIDEBAR BACKDROP (MOBILE) -->
+ <button class="sidebar-backdrop" type="button" data-act="sidebar-close" aria-label="Close navigation" hidden></button>
+ 
+ <!-- MAIN SIDEBAR -->
+ <aside class="main-sidebar" id="mainSidebar" aria-label="Main navigation">
+ <div class="main-sidebar-brand">
+ <div class="main-brand-mark">RP</div>
+ <div>
+ <strong>REPORT-PRO</strong>
+ <small>Dhanmondi SC</small>
+ </div>
+ </div>
+ 
+ <div class="sidebar-caption">Main menu</div>
+ <nav class="main-nav" aria-label="Main pages">
+ <button class="main-nav-link" type="button" data-act="tab" data-tab="dashboard" aria-selected="true" aria-current="page">
+ <span class="main-nav-icon">▦</span><span>Dashboard</span>
+ </button>
+ <button class="main-nav-link" type="button" data-act="tab" data-tab="report" aria-selected="false">
+ <span class="main-nav-icon">▤</span><span>Report</span>
+ </button>
+ <button class="main-nav-link" type="button" data-act="tab" data-tab="history" aria-selected="false">
+ <span class="main-nav-icon">◷</span><span>History</span>
+ </button>
+ <button class="main-nav-link" type="button" data-act="tab" data-tab="analytics" aria-selected="false">
+ <span class="main-nav-icon">▥</span><span>Analytics</span>
+ </button>
+ <button class="main-nav-link" type="button" data-act="tab" data-tab="calendar" aria-selected="false">
+ <span class="main-nav-icon">📅</span><span>Calendar</span>
+ </button>
+ <button class="main-nav-link" type="button" data-act="tab" data-tab="money" aria-selected="false">
+ <span class="main-nav-icon">৳</span><span>Finance</span>
+ </button>
+ </nav>
+ 
+ <div class="sidebar-caption sidebar-caption-bottom">Preferences</div>
+ <nav class="main-nav">
+ <button class="main-nav-link" type="button" data-act="tab" data-tab="settings" aria-selected="false">
+ <span class="main-nav-icon">⚙</span><span>Settings</span>
+ </button>
+ </nav>
+ 
+ <div class="sidebar-footer">
+ <span class="sidebar-status-dot"></span><span>Secure workspace</span>
+ </div>
+ </aside>
+ 
+ <!-- MAIN CONTENT AREA -->
+ <div class="app-main">
+ <!-- STICKY TOP BAR -->
+ <header class="topbar" role="banner">
+ <div class="topbar-in">
+ <button class="btn btn-icon sidebar-toggle" type="button" data-act="sidebar-toggle" aria-label="Toggle navigation" aria-controls="mainSidebar">☰</button>
+ 
+ <div class="brand topbar-brand">
+ <div><strong>Activity Tracker</strong><small>Dhanmondi SC</small></div>
+ </div>
+ 
+ <div class="spacer"></div>
+ 
+ <span id="syncPill" class="pill online" role="status" aria-label="Sync status: online" aria-live="polite">Connecting</span>
+ <span id="currentUser" class="user-email" title="Signed-in account" aria-label="Current user"></span>
+ </div>
+ </header>
+ 
+ <!-- MAIN CONTENT -->
+ <main class="container" role="main">
+ 
+ <!-- DASHBOARD VIEW -->
+ <section id="view-dashboard" class="view-section stack" hidden>
+ <div class="card stack">
+ <div class="toolbar">
+ <h2 class="card-title">Dhanmondi SC Dashboard</h2>
+ <div class="spacer"></div>
+ <div class="field" style="width:140px">
+ <label for="dashYear">Year</label>
+ <select id="dashYear" aria-label="Dashboard year"></select>
+ </div>
+ </div>
+ <div class="stats" id="dashboardStats" role="region" aria-label="Dashboard statistics"></div>
+ </div>
+ 
+ <div class="card stack">
+ <h2 class="card-title">Monthly overtime</h2>
+ <div class="bars" id="dashboardBars" role="img" aria-label="Monthly overtime overview"></div>
+ </div>
+ 
+ <div id="personalDashboard" class="stack"></div>
+ 
+ <div class="card stack">
+ <h2 class="card-title">Recent reports</h2>
+ <div class="tbl-wrap">
+ <table class="data" role="table" aria-label="Recent activity reports">
+ <thead><tr><th>Date</th><th>Shift</th><th>Activities</th><th>OT</th></tr></thead>
+ <tbody id="dashboardRecent"></tbody>
+ </table>
+ </div>
+ </div>
+ </section>
+ 
+ <!-- REPORT VIEW -->
+ <section id="view-report" class="view-section stack">
+ <div class="card toolbar">
+ <button class="btn btn-icon" data-act="prev" title="Previous report" aria-label="Previous report">‹</button>
+ <button class="btn btn-icon" data-act="next" title="Next report" aria-label="Next report">›</button>
+ 
+ <div class="field">
+ <input type="date" id="gotoDate" aria-label="Go to date" title="Jump to a saved report by date" />
+ </div>
+ 
+ <span id="dirtyChip" class="chip" hidden aria-label="Unsaved changes indicator">Unsaved changes</span>
+ 
+ <div class="spacer"></div>
+ 
+ <button class="btn" data-act="new">New report</button>
+ <button class="btn" data-act="copy-last">Copy last</button>
+ <button class="btn btn-primary" data-act="save" title="Ctrl + S">Save report</button>
+ </div>
+ 
+ <form id="reportForm" class="stack" novalidate>
+ <input type="hidden" id="editingId">
+ 
+ <div class="card">
+ <div class="grid g2">
+ <div class="grid">
+ <div class="field">
+ <label for="assignedBy">SC head</label>
+ <input id="assignedBy" type="text">
+ </div>
+ <div class="field">
+ <label for="userName">Name</label>
+ <input id="userName" type="text" required aria-required="true">
+ </div>
+ <div class="grid g2">
+ <div class="field">
+ <label for="hrId">HR ID</label>
+ <input id="hrId" type="text">
+ </div>
+ <div class="field">
+ <label for="userDesig">Designation</label>
+ <input id="userDesig" type="text">
+ </div>
+ </div>
+ </div>
+ 
+ <div class="grid">
+ <div class="grid g3">
+ <div class="field">
+ <label for="reportDate">Date</label>
+ <input type="date" id="reportDate" required aria-required="true">
+ </div>
+ <div class="field">
+ <label for="startTime">From</label>
+ <input type="time" id="startTime">
+ </div>
+ <div class="field">
+ <label for="endTime">To</label>
+ <input type="time" id="endTime">
+ </div>
+ </div>
+ 
+ <div class="grid g2">
+ <div class="field">
+ <label for="otHours">Overtime today</label>
+ <input id="otHours" type="text" readonly value="0 hrs">
+ </div>
+ 
+ <div class="field">
+ <span class="lbl">Shift</span>
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+ <div class="seg" role="radiogroup" aria-label="Work shift">
+ <label>
+ <input type="radio" name="shift" id="shiftDay" checked>
+ <span>Day</span>
+ </label>
+ <label>
+ <input type="radio" name="shift" id="shiftNight">
+ <span>Night</span>
+ </label>
+ <label>
+ <input type="radio" name="shift" id="shiftOff">
+ <span>Off duty</span>
+ </label>
+ </div>
+ 
+ <select id="offType" aria-label="Off duty type" hidden style="width:auto">
+ <option value="Weekly Holiday">Weekly Holiday</option>
+ <option value="Goverment Holiday">Government holiday</option>
+ <option value="Duty Shifting">Duty Shifting</option>
+ <option value="Sick Leave">Sick leave</option>
+ <option value="Anual leave">Annual leave</option>
+ <option value="Casual leave">Casual leave</option>
+ </select>
+ </div>
+ 
+ <label class="inline-check holiday-duty-check">
+ <input type="checkbox" id="governmentHolidayDuty">
+ <span>Government holiday duty (৳900 fixed allowance)</span>
+ </label>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ <div id="entries" class="stack"></div>
+ <button class="btn" data-act="add-row" style="width:100%">+ Add activity</button>
+ </form>
+ </section>
+ 
+ <!-- HISTORY VIEW -->
+ <section id="view-history" class="view-section stack" hidden>
+ <div class="card stack">
+ <h2 class="card-title">Find reports</h2>
+ <div class="grid g4">
+ <div class="field">
+ <label for="hSearch">Search</label>
+ <input id="hSearch" type="search" placeholder="Site, client, activity…">
+ </div>
+ <div class="field">
+ <label for="hShift">Shift</label>
+ <select id="hShift">
+ <option value="all">All shifts</option>
+ <option value="day">Day</option>
+ <option value="night">Night</option>
+ <option value="leave">Leave</option>
+ <option value="off">Off / holiday</option>
+ </select>
+ </div>
+ <div class="field">
+ <label for="dateFrom">From</label>
+ <input type="date" id="dateFrom">
+ </div>
+ <div class="field">
+ <label for="dateTo">To</label>
+ <input type="date" id="dateTo">
+ </div>
+ </div>
+ 
+ <div class="stats" role="region" aria-label="Search results summary">
+ <div class="stat">
+ <b id="sCount">0</b>
+ <span>Reports found</span>
+ </div>
+ <div class="stat">
+ <b id="sOt">0 hrs</b>
+ <span>Total overtime</span>
+ </div>
+ <div class="stat">
+ <b id="sRange">All dates</b>
+ <span>Range</span>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="toolbar">
+ <h2 class="card-title">Saved reports</h2>
+ <div class="spacer"></div>
+ <button class="btn btn-sm" data-act="reset-filters">Reset filters</button>
+ <button class="btn btn-sm" id="selBtn" data-act="select-all">Select all</button>
+ <button class="btn btn-sm btn-danger" id="delSelBtn" data-act="del-selected" disabled>Delete selected</button>
+ </div>
+ 
+ <div id="historyList" class="stack"></div>
+ </section>
+ 
+ <!-- ANALYTICS VIEW -->
+ <section id="view-analytics" class="view-section stack" hidden>
+ <div class="card stack">
+ <div class="toolbar">
+ <h2 class="card-title">Monthly overtime</h2>
+ <div class="spacer"></div>
+ <div class="field" style="width:120px">
+ <select id="yearSel" aria-label="Year"></select>
+ </div>
+ </div>
+ <div class="stats" id="yearStats" role="region" aria-label="Yearly statistics"></div>
+ <div class="bars" id="bars" role="img" aria-label="Overtime hours per month"></div>
+ </div>
+ 
+ <div class="card tbl-wrap">
+ <table class="data" role="table" aria-label="Monthly overtime breakdown">
+ <thead><tr><th>Month</th><th>Day</th><th>Night</th><th>Leave</th><th>Off</th><th>Overtime</th></tr></thead>
+ <tbody id="monthRows"></tbody>
+ </table>
+ </div>
+ </section>
+ 
+ <!-- CALENDAR VIEW -->
+ <section id="view-calendar" class="view-section stack" hidden>
+ <div class="card stack">
+ <div class="toolbar">
+ <h2 class="card-title">Attendance calendar</h2>
+ <span class="spacer"></span>
+ <button class="btn btn-icon" id="calPrev" type="button" aria-label="Previous month">‹</button>
+ <input type="month" id="calMonth" aria-label="Calendar month" style="max-width:160px">
+ <button class="btn btn-icon" id="calNext" type="button" aria-label="Next month">›</button>
+ </div>
+ 
+ <div class="stats" id="calendarSummary" role="region" aria-label="Calendar summary"></div>
+ <div class="calendar-grid" id="calendarGrid" aria-label="Monthly duty calendar"></div>
+ <p id="missingDates" class="muted small-note"></p>
+ 
+ <div class="calendar-legend">
+ <span><i class="legend-dot day"></i>Day</span>
+ <span><i class="legend-dot night"></i>Night</span>
+ <span><i class="legend-dot off"></i>Off</span>
+ <span><i class="legend-dot leave"></i>Leave</span>
+ <span><i class="legend-dot missing"></i>Missing report</span>
+ </div>
+ </div>
+ 
+ <div class="card stack">
+ <h2 class="card-title">Expected duty weekdays</h2>
+ <p class="muted small-note">Select your normal workdays. Only selected weekdays without a saved report will be flagged as Missing.</p>
+ <div class="weekday-picks" id="expectedWeekdays" role="group" aria-label="Expected workdays">
+ <label><input type="checkbox" value="0"> <span>Sunday</span></label>
+ <label><input type="checkbox" value="1"> <span>Monday</span></label>
+ <label><input type="checkbox" value="2"> <span>Tuesday</span></label>
+ <label><input type="checkbox" value="3"> <span>Wednesday</span></label>
+ <label><input type="checkbox" value="4"> <span>Thursday</span></label>
+ <label><input type="checkbox" value="5"> <span>Friday</span></label>
+ <label><input type="checkbox" value="6"> <span>Saturday</span></label>
+ </div>
+ </div>
+ </section>
+ 
+ <!-- FINANCE VIEW -->
+ <section id="view-money" class="view-section stack" hidden>
+ <div class="card stack">
+ <div class="toolbar">
+ <h2 class="card-title">Salary & OT payout</h2>
+ <span class="spacer"></span>
+ <button class="btn btn-icon" id="moneyPrev" type="button" aria-label="Previous salary month">‹</button>
+ <input type="month" id="moneyMonth" aria-label="Salary month" style="max-width:160px">
+ <button class="btn btn-icon" id="moneyNext" type="button" aria-label="Next salary month">›</button>
+ </div>
+ <div id="moneyPayoutSummary"></div>
+ <p id="financeSyncStatus" class="muted small-note">Finance data is stored separately from daily reports.</p>
+ </div>
+ 
+ <div class="card stack">
+ <h2 class="card-title">Appraisal & rate history</h2>
+ <p class="muted small-note">Add a new effective date after appraisal. Salary and hourly OT rate are both versioned.</p>
+ <form id="profileForm" class="grid g3" novalidate>
+ <div class="field">
+ <label for="profileDate">Effective from</label>
+ <input id="profileDate" name="effectiveFrom" type="date" required aria-required="true">
+ </div>
+ <div class="field">
+ <label for="profileSalary">Monthly salary (৳)</label>
+ <input id="profileSalary" name="salary" type="number" min="0" step="0.01" placeholder="Enter salary" required aria-required="true">
+ </div>
+ <div class="field">
+ <label for="profileOtRate">OT rate / hour (৳)</label>
+ <input id="profileOtRate" name="otRate" type="number" min="0" step="0.01" value="235" required aria-required="true">
+ </div>
+ <div class="field">
+ <button class="btn btn-primary" type="submit">Save appraisal rate</button>
+ </div>
+ </form>
+ <div id="profileList" class="finance-list"></div>
+ </div>
+ 
+ <div class="card stack">
+ <h2 class="card-title">Food allowance</h2>
+ <p class="muted small-note">Manual entry for out-of-Dhaka travel (100 km or more).</p>
+ <form id="allowanceForm" class="grid g3" novalidate>
+ <div class="field">
+ <label for="allowanceDate">Date</label>
+ <input id="allowanceDate" name="date" type="date" required aria-required="true">
+ </div>
+ <div class="field">
+ <label>Location</label>
+ <input name="location" placeholder="Where did you travel?" type="text">
+ </div>
+ <div class="field">
+ <label>Distance (KM)</label>
+ <input name="distanceKm" type="number" min="0" step="0.1" placeholder="100 or more">
+ </div>
+ <div class="field">
+ <label>Allowance amount (৳)</label>
+ <input name="amount" type="number" min="0.01" step="0.01" required aria-required="true">
+ </div>
+ <div class="field">
+ <label>Online bill Reference No.</label>
+ <input name="referenceNo" placeholder="Bill / reference number" type="text">
+ </div>
+ <div class="field">
+ <label>Status</label>
+ <select name="status">
+ <option value="pending">Pending</option>
+ <option value="submitted">Submitted</option>
+ <option value="paid">Paid / Received</option>
+ </select>
+ </div>
+ <div class="field">
+ <label>Remarks</label>
+ <input name="remarks" placeholder="Optional notes" type="text">
+ </div>
+ <div class="field">
+ <button class="btn btn-primary" type="submit">Add food allowance</button>
+ </div>
+ </form>
+ <div id="allowanceList" class="finance-list"></div>
+ </div>
+ 
+ <div class="card stack">
+ <h2 class="card-title">Food expense</h2>
+ <p class="muted small-note">Food expenses reduce the net balance and are never counted as income.</p>
+ <form id="expenseForm" class="grid g3" novalidate>
+ <div class="field">
+ <label for="expenseDate">Date</label>
+ <input id="expenseDate" name="date" type="date" required aria-required="true">
+ </div>
+ <div class="field">
+ <label>Amount (৳)</label>
+ <input name="amount" type="number" min="0.01" step="0.01" required aria-required="true">
+ </div>
+ <div class="field">
+ <label>Location</label>
+ <input name="location" placeholder="Location" type="text">
+ </div>
+ <div class="field">
+ <label>Food details</label>
+ <input name="details" placeholder="Meal / food details" type="text">
+ </div>
+ <div class="field">
+ <label>Remarks</label>
+ <input name="remarks" placeholder="Optional notes" type="text">
+ </div>
+ <div class="field">
+ <button class="btn btn-primary" type="submit">Add food expense</button>
+ </div>
+ </form>
+ <div id="expenseList" class="finance-list"></div>
+ </div>
+ 
+ <div class="card stack">
+ <h2 class="card-title">Daily journey log</h2>
+ <p class="muted small-note">Record each movement. You can add multiple journeys on the same day.</p>
+ <form id="journeyForm" class="grid g3" novalidate>
+ <div class="field">
+ <label for="journeyDate">Journey date</label>
+ <input id="journeyDate" name="date" type="date" required aria-required="true">
+ </div>
+ <div class="field">
+ <label>From</label>
+ <input name="from" required placeholder="Starting location" type="text" aria-required="true">
+ </div>
+ <div class="field">
+ <label>To</label>
+ <input name="to" required placeholder="Destination" type="text" aria-required="true">
+ </div>
+ <div class="field">
+ <label>Client / Site</label>
+ <input name="client" placeholder="Client or site name" type="text">
+ </div>
+ <div class="field">
+ <label>Distance (KM)</label>
+ <input name="distanceKm" type="number" min="0" step="0.1">
+ </div>
+ <div class="field">
+ <label>Purpose</label>
+ <input name="purpose" placeholder="Why did you travel?" type="text">
+ </div>
+ <div class="field">
+ <label>Transport</label>
+ <input name="transport" placeholder="Bus, CNG, car, etc." type="text">
+ </div>
+ <div class="field">
+ <label>Remarks</label>
+ <input name="remarks" placeholder="Optional notes" type="text">
+ </div>
+ <div class="field">
+ <button class="btn btn-primary" type="submit">Add journey</button>
+ </div>
+ </form>
+ <div id="journeyList" class="finance-list"></div>
+ </div>
+ </section>
+ 
+ <!-- SETTINGS VIEW -->
+ <section id="view-settings" class="view-section settings-shell" hidden>
+ <aside class="settings-sidebar card" aria-label="Settings navigation">
+ <div class="settings-sidebar-head">
+ <span class="settings-kicker">Control panel</span>
+ <h2>Settings</h2>
+ <p class="muted small-note">Manage your app preferences</p>
+ </div>
+ <nav class="settings-nav" aria-label="Settings pages">
+ <button type="button" class="settings-nav-btn active" data-setting-page="general" aria-current="page">
+ <span>⚙</span>
+ <span><b>General</b><small>Application overview</small></span>
+ </button>
+ <button type="button" class="settings-nav-btn" data-setting-page="appearance">
+ <span>◐</span>
+ <span><b>Appearance</b><small>Theme and display</small></span>
+ </button>
+ <button type="button" class="settings-nav-btn" data-setting-page="data">
+ <span>⇄</span>
+ <span><b>Data & Sync</b><small>Backup and cloud sync</small></span>
+ </button>
+ <button type="button" class="settings-nav-btn" data-setting-page="account">
+ <span>♙</span>
+ <span><b>Account & Security</b><small>Access and sign-in</small></span>
+ </button>
+ <button type="button" class="settings-nav-btn" data-setting-page="system">
+ <span>ⓘ</span>
+ <span><b>System Information</b><small>Application details</small></span>
+ </button>
+ </nav>
+ </aside>
+ 
+ <div class="settings-content">
+ <div class="settings-page stack" data-settings-view="general">
+ <div class="settings-page-heading">
+ <div>
+ <span class="settings-kicker">Preferences</span>
+ <h2>General Settings</h2>
+ <p class="muted">A central place for your Report-Pro application controls.</p>
+ </div>
+ </div>
+ <div class="card settings-info-card">
+ <div class="settings-info-icon">⚙</div>
+ <div>
+ <h3>Application settings</h3>
+ <p class="muted">Use the menu on the left to open each settings page. Your reports and records continue to use their current storage.</p>
+ </div>
+ </div>
+ <div class="card stack">
+ <h3 class="card-title">Available controls</h3>
+ <div class="settings-row">
+ <div>
+ <b>Appearance</b>
+ <p class="muted small-note">Switch between light and dark display.</p>
+ </div>
+ <button class="btn" type="button" data-setting-jump="appearance">Open</button>
+ </div>
+ <div class="settings-row">
+ <div>
+ <b>Data & Sync</b>
+ <p class="muted small-note">Synchronise, export and restore your data.</p>
+ </div>
+ <button class="btn" type="button" data-setting-jump="data">Open</button>
+ </div>
+ <div class="settings-row">
+ <div>
+ <b>Account & Security</b>
+ <p class="muted small-note">Review the signed-in account and access model.</p>
+ </div>
+ <button class="btn" type="button" data-setting-jump="account">Open</button>
+ </div>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="settings-page stack" data-settings-view="appearance" hidden>
+ <div class="settings-page-heading">
+ <div>
+ <span class="settings-kicker">Display</span>
+ <h2>Appearance</h2>
+ <p class="muted">Choose how Report-Pro looks on this device.</p>
+ </div>
+ </div>
+ <div class="card stack">
+ <h3 class="card-title">Color theme</h3>
+ <p class="muted small-note">Your selection is saved locally and applies across the application.</p>
+ <div class="settings-theme-options">
+ <button class="theme-choice" type="button" data-theme-choice="light">
+ <span class="theme-preview light-preview">☀</span>
+ <b>Light</b>
+ <small>Bright interface</small>
+ </button>
+ <button class="theme-choice" type="button" data-theme-choice="dark">
+ <span class="theme-preview dark-preview">☾</span>
+ <b>Dark</b>
+ <small>Low-light interface</small>
+ </button>
+ </div>
+ <p id="settingsThemeStatus" class="muted small-note" aria-live="polite"></p>
+ </div>
+ </div>
+ 
+ <div class="settings-page stack" data-settings-view="data" hidden>
+ <div class="settings-page-heading">
+ <div>
+ <span class="settings-kicker">Storage</span>
+ <h2>Data & Synchronisation</h2>
+ <p class="muted">Manage your local backup and Firebase cloud copy.</p>
+ </div>
+ </div>
+ <div class="card stack">
+ <div class="settings-row">
+ <div>
+ <h3 class="card-title">Cloud synchronisation</h3>
+ <p class="muted small-note">Fetch the latest cloud records and synchronise pending local changes.</p>
+ </div>
+ <button class="btn btn-primary" type="button" data-act="sync">Sync now</button>
+ </div>
+ <div class="settings-row">
+ <div>
+ <b>Connection status</b>
+ <p class="muted small-note">Current Firebase sync state.</p>
+ </div>
+ <span id="settingsSyncStatus" class="pill online">Connecting</span>
+ </div>
+ </div>
+ <div class="card stack">
+ <h3 class="card-title">Backup & restore</h3>
+ <p class="muted small-note">Keep a separate backup before major updates.</p>
+ <div class="settings-action-grid">
+ <button class="btn" type="button" data-act="json-backup">Download JSON backup</button>
+ <button class="btn" type="button" data-act="restore">Restore from file</button>
+ </div>
+ </div>
+ <div class="card stack">
+ <h3 class="card-title">Report exports</h3>
+ <div class="settings-action-grid">
+ <button class="btn" type="button" data-act="pdf">Download PDF</button>
+ <button class="btn" type="button" data-act="excel">Download Excel</button>
+ <button class="btn" type="button" data-act="print">Print reports</button>
+ </div>
+ </div>
+ </div>
+ 
+ <div class="settings-page stack" data-settings-view="account" hidden>
+ <div class="settings-page-heading">
+ <div>
+ <span class="settings-kicker">Access control</span>
+ <h2>Account & Security</h2>
+ <p class="muted">Review the current sign-in and security model.</p>
+ </div>
+ </div>
+ <div class="card stack">
+ <h3 class="card-title">Signed-in account</h3>
+ <div class="settings-row">
+ <div>
+ <b>Current user</b>
+ <p class="muted small-note">Authenticated Firebase account</p>
+ </div>
+ <strong id="settingsAccountEmail" class="settings-account-value">Loading…</strong>
+ </div>
+ <div class="settings-row">
+ <div>
+ <b>Authentication</b>
+ <p class="muted small-note">Firebase Authentication</p>
+ </div>
+ <span class="status-tag">Enabled</span>
+ </div>
+ <div class="settings-row">
+ <div>
+ <b>Public registration</b>
+ <p class="muted small-note">New accounts are created by an administrator.</p>
+ </div>
+ <span class="status-tag">Disabled</span>
+ </div>
+ <div class="settings-row">
+ <div>
+ <b>Session</b>
+ <p class="muted small-note">Sign out when using a shared device.</p>
+ </div>
+ <button class="btn btn-danger" type="button" id="signOutBtn">Sign out</button>
+ </div>
+ </div>
+ <div class="card">
+ <h3 class="card-title">Security note</h3>
+ <p class="muted small-note">Database access is controlled by Firebase Realtime Database Rules. Review and deploy rule changes in Firebase Console.</p>
+ </div>
+ </div>
+ 
+ <div class="settings-page stack" data-settings-view="system" hidden>
+ <div class="settings-page-heading">
+ <div>
+ <span class="settings-kicker">About</span>
+ <h2>System Information</h2>
+ <p class="muted">Technical details about this application.</p>
+ </div>
+ </div>
+ <div class="card stack">
+ <div class="settings-row">
+ <b>Application</b>
+ <span>Report-Pro · Dhanmondi SC</span>
+ </div>
+ <div class="settings-row">
+ <b>Frontend</b>
+ <span>HTML5, CSS3 & Vanilla JavaScript</span>
+ </div>
+ <div class="settings-row">
+ <b>Cloud database</b>
+ <span>Firebase Realtime Database</span>
+ </div>
+ <div class="settings-row">
+ <b>Personal finance module</b>
+ <span>Enabled</span>
+ </div>
+ <div class="settings-row">
+ <b>Telegram integration</b>
+ <span>Companion bot</span>
+ </div>
+ </div>
+ </div>
+ </div>
+ </section>
+ 
+ </main>
+ </div>
+ </div>
+ </div>
+ 
+ <!-- PRINT CONTAINER -->
+ <div id="printRoot" hidden></div>
+ 
+ <!-- TOAST NOTIFICATIONS -->
+ <div class="toasts" id="toasts" role="region" aria-live="polite" aria-atomic="true"></div>
+ 
+ <!-- LOADER OVERLAY -->
+ <div class="loader" id="loader" hidden role="status" aria-label="Loading">
+ <div class="spin"></div>
+ <span id="loaderText">Working…</span>
+ </div>
+ 
+ <!-- HIDDEN FILE INPUT -->
+ <input type="file" id="restoreInput" accept=".xlsx,.xls,.json" hidden aria-label="Restore file">
+ 
+ <!-- DATALIST FOR AUTOCOMPLETE -->
+ <datalist id="dl-client"></datalist>
+ <datalist id="dl-assign"></datalist>
+ <datalist id="dl-team"></datalist>
+ <datalist id="dl-site"></datalist>
+ 
+ <!-- SCRIPTS -->
+ <script src="app.js"></script>
+ <script src="personal.js"></script>
+</body>
+</html>
+</parameter>
+</invoke>
