@@ -233,7 +233,7 @@ function showTab(t){
 }
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme',t);
-  $('themeBtn').textContent=t==='dark'?'💡':'⚫';
+  $('themeBtn').textContent=t==='dark'?'💡':' 🌙 ';
 }
 
 /* ---------- Skeleton loaders ---------- */
