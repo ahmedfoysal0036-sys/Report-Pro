@@ -39,40 +39,44 @@
 
 <!-- ── Main app ───────────────────────────────────────── -->
 <div id="app" hidden>
-  <div class="app-layout">
-    <button class="sidebar-backdrop" type="button" data-act="sidebar-close" aria-label="Close navigation" hidden></button>
-    <aside class="main-sidebar" id="mainSidebar" aria-label="Main navigation">
-      <div class="main-sidebar-brand"><div class="main-brand-mark">RP</div><div><strong>REPORT-PRO</strong><small>Dhanmondi SC</small></div></div>
-      <div class="sidebar-caption">MAIN MENU</div>
-      <nav class="main-nav" aria-label="Main pages">
-        <button class="main-nav-link" type="button" data-act="tab" data-tab="dashboard" aria-selected="true"><span class="main-nav-icon">▦</span><span>Dashboard</span></button>
-        <button class="main-nav-link" type="button" data-act="tab" data-tab="report" aria-selected="false"><span class="main-nav-icon">▤</span><span>Report</span></button>
-        <button class="main-nav-link" type="button" data-act="tab" data-tab="history" aria-selected="false"><span class="main-nav-icon">◷</span><span>History</span></button>
-        <button class="main-nav-link" type="button" data-act="tab" data-tab="analytics" aria-selected="false"><span class="main-nav-icon">▥</span><span>Analytics</span></button>
-        <button class="main-nav-link" type="button" data-act="tab" data-tab="calendar" aria-selected="false"><span class="main-nav-icon">▦</span><span>Calendar</span></button>
-        <button class="main-nav-link" type="button" data-act="tab" data-tab="money" aria-selected="false"><span class="main-nav-icon">৳</span><span>Money</span></button>
-      </nav>
-      <div class="sidebar-caption sidebar-caption-bottom">PREFERENCES</div>
-      <nav class="main-nav">
-        <button class="main-nav-link" type="button" data-act="tab" data-tab="settings" aria-selected="false"><span class="main-nav-icon">⚙</span><span>Settings</span></button>
-      </nav>
-      <div class="sidebar-footer"><span class="sidebar-status-dot"></span><span>Secure workspace</span></div>
-    </aside>
-    <div class="app-main">
 
   <!-- Top bar -->
   <header class="topbar">
     <div class="topbar-in">
-      <button class="btn btn-icon sidebar-toggle" type="button" data-act="sidebar-toggle" aria-label="Open navigation">☰</button>
-      <div class="brand topbar-brand">
+      <div class="brand">
         <div>Activity Tracker<small>Dhanmondi SC</small></div>
       </div>
+
+      <!-- Desktop tabs -->
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button role="tab" data-act="tab" data-tab="dashboard" aria-selected="false">Dashboard</button>
+        <button role="tab" data-act="tab" data-tab="report"    aria-selected="true">Report</button>
+        <button role="tab" data-act="tab" data-tab="history"   aria-selected="false">History</button>
+        <button role="tab" data-act="tab" data-tab="analytics" aria-selected="false">Analytics</button>
+        <button role="tab" data-act="tab" data-tab="calendar" aria-selected="false">Calendar</button>
+        <button role="tab" data-act="tab" data-tab="money" aria-selected="false">Money</button>
+      </nav>
 
       <div class="spacer"></div>
       <span id="syncPill" class="pill">Connecting</span>
       <span id="currentUser" class="user-email" title="Signed-in account"></span>
+      <button class="btn btn-sm" id="signOutBtn" type="button">Sign out</button>
 
+      <details class="menu" id="menu">
+        <summary class="btn">Export &amp; backup ▾</summary>
+        <div class="menu-pop">
+          <button data-act="pdf">Download PDF</button>
+          <button data-act="excel">Download Excel</button>
+          <button data-act="print">Print</button>
+          <hr>
+          <button data-act="json-backup">Backup all data (JSON)</button>
+          <button data-act="restore">Restore from Excel or JSON</button>
+          <hr>
+          <button data-act="sync">Sync from cloud now</button>
+        </div>
+      </details>
 
+      <button class="btn btn-icon" id="themeBtn" data-act="theme" aria-label="Switch theme">☾</button>
     </div>
   </header>
 
@@ -310,110 +314,34 @@
       </div>
     </section>
 
-    <!-- SETTINGS: TP-Link-style left navigation with separate pages -->
-    <section id="view-settings" class="settings-shell" hidden>
-      <aside class="settings-sidebar card" aria-label="Settings navigation">
-        <div class="settings-sidebar-head">
-          <span class="settings-kicker">CONTROL PANEL</span>
-          <h2>Settings</h2>
-          <p class="muted small-note">Manage your app preferences</p>
-        </div>
-        <nav class="settings-nav" aria-label="Settings pages">
-          <button type="button" class="settings-nav-btn active" data-setting-page="general" aria-current="page"><span>⚙</span><span><b>General</b><small>Application overview</small></span></button>
-          <button type="button" class="settings-nav-btn" data-setting-page="appearance"><span>◐</span><span><b>Appearance</b><small>Theme and display</small></span></button>
-          <button type="button" class="settings-nav-btn" data-setting-page="data"><span>⇄</span><span><b>Data &amp; Sync</b><small>Backup and cloud sync</small></span></button>
-          <button type="button" class="settings-nav-btn" data-setting-page="account"><span>♙</span><span><b>Account &amp; Security</b><small>Access and sign-in</small></span></button>
-          <button type="button" class="settings-nav-btn" data-setting-page="system"><span>ⓘ</span><span><b>System Information</b><small>Application details</small></span></button>
-        </nav>
-      </aside>
-
-      <div class="settings-content">
-        <section class="settings-page stack" data-settings-view="general">
-          <div class="settings-page-heading">
-            <div><span class="settings-kicker">PREFERENCES</span><h2>General Settings</h2><p class="muted">A central place for your Report-Pro application controls.</p></div>
-          </div>
-          <div class="card settings-info-card">
-            <div class="settings-info-icon">⚙</div>
-            <div><h3>Application settings</h3><p class="muted">Use the menu on the left to open each settings page. Your existing reports, activity history, calendar and finance records continue to use their current storage locations.</p></div>
-          </div>
-          <div class="card stack">
-            <h3 class="card-title">Available controls</h3>
-            <div class="settings-row"><div><b>Appearance</b><p class="muted small-note">Switch between light and dark display.</p></div><button class="btn" type="button" data-setting-jump="appearance">Open</button></div>
-            <div class="settings-row"><div><b>Data &amp; Sync</b><p class="muted small-note">Synchronise, export and restore your data.</p></div><button class="btn" type="button" data-setting-jump="data">Open</button></div>
-            <div class="settings-row"><div><b>Account &amp; Security</b><p class="muted small-note">Review the signed-in account and access model.</p></div><button class="btn" type="button" data-setting-jump="account">Open</button></div>
-          </div>
-        </section>
-
-        <section class="settings-page stack" data-settings-view="appearance" hidden>
-          <div class="settings-page-heading"><div><span class="settings-kicker">DISPLAY</span><h2>Appearance</h2><p class="muted">Choose how Report-Pro looks on this device.</p></div></div>
-          <div class="card stack">
-            <h3 class="card-title">Color theme</h3>
-            <p class="muted small-note">Your selection is saved locally and applies across the application.</p>
-            <div class="settings-theme-options">
-              <button class="theme-choice" type="button" data-theme-choice="light"><span class="theme-preview light-preview">☀</span><b>Light</b><small>Bright interface</small></button>
-              <button class="theme-choice" type="button" data-theme-choice="dark"><span class="theme-preview dark-preview">☾</span><b>Dark</b><small>Low-light interface</small></button>
-            </div>
-            <p id="settingsThemeStatus" class="muted small-note" aria-live="polite"></p>
-          </div>
-        </section>
-
-        <section class="settings-page stack" data-settings-view="data" hidden>
-          <div class="settings-page-heading"><div><span class="settings-kicker">STORAGE</span><h2>Data &amp; Synchronisation</h2><p class="muted">Manage your local backup and Firebase cloud copy.</p></div></div>
-          <div class="card stack">
-            <div class="settings-row"><div><h3 class="card-title">Cloud synchronisation</h3><p class="muted small-note">Fetch the latest cloud records and synchronise pending local changes.</p></div><button class="btn btn-primary" type="button" data-act="sync">Sync now</button></div>
-            <div class="settings-row"><div><b>Connection status</b><p class="muted small-note">Current Firebase sync state.</p></div><span id="settingsSyncStatus" class="pill">Connecting</span></div>
-          </div>
-          <div class="card stack">
-            <h3 class="card-title">Backup &amp; restore</h3>
-            <p class="muted small-note">Keep a separate backup before major updates or restoring older data.</p>
-            <div class="settings-action-grid">
-              <button class="btn" type="button" data-act="json-backup">Download full JSON backup</button>
-              <button class="btn" type="button" data-act="restore">Restore from Excel / JSON</button>
-            </div>
-          </div>
-          <div class="card stack">
-            <h3 class="card-title">Report exports</h3>
-            <div class="settings-action-grid">
-              <button class="btn" type="button" data-act="pdf">Download PDF reports</button>
-              <button class="btn" type="button" data-act="excel">Download Excel</button>
-              <button class="btn" type="button" data-act="print">Print reports</button>
-            </div>
-          </div>
-        </section>
-
-        <section class="settings-page stack" data-settings-view="account" hidden>
-          <div class="settings-page-heading"><div><span class="settings-kicker">ACCESS CONTROL</span><h2>Account &amp; Security</h2><p class="muted">Review the current sign-in and security model.</p></div></div>
-          <div class="card stack">
-            <h3 class="card-title">Signed-in account</h3>
-            <div class="settings-row"><div><b>Current user</b><p class="muted small-note">Authenticated Firebase account</p></div><strong id="settingsAccountEmail" class="settings-account-value">Loading…</strong></div>
-            <div class="settings-row"><div><b>Authentication</b><p class="muted small-note">Firebase Authentication</p></div><span class="status-tag">Enabled</span></div>
-            <div class="settings-row"><div><b>Public registration</b><p class="muted small-note">New accounts are created by an administrator.</p></div><span class="status-tag">Disabled</span></div>
-            <div class="settings-row"><div><b>Session</b><p class="muted small-note">Sign out when using a shared device.</p></div><button class="btn btn-danger" type="button" id="signOutBtn">Sign out</button></div>
-          </div>
-          <div class="card">
-            <h3 class="card-title">Security note</h3>
-            <p class="muted small-note">Database access is controlled by your Firebase Realtime Database Rules. Review and deploy rule changes in Firebase Console. This page does not modify authentication users or database permissions.</p>
-          </div>
-        </section>
-
-        <section class="settings-page stack" data-settings-view="system" hidden>
-          <div class="settings-page-heading"><div><span class="settings-kicker">ABOUT</span><h2>System Information</h2><p class="muted">Technical details about this application.</p></div></div>
-          <div class="card stack">
-            <div class="settings-row"><b>Application</b><span>Report-Pro · Dhanmondi SC</span></div>
-            <div class="settings-row"><b>Frontend</b><span>HTML, CSS &amp; Vanilla JavaScript</span></div>
-            <div class="settings-row"><b>Cloud database</b><span>Firebase Realtime Database</span></div>
-            <div class="settings-row"><b>Personal finance module</b><span>Enabled</span></div>
-            <div class="settings-row"><b>Telegram integration</b><span>Companion bot</span></div>
-          </div>
-        </section>
-      </div>
-    </section>
-
   </main>
-    </div><!-- /.app-main -->
-  </div><!-- /.app-layout -->
 
-  <!-- Main navigation is the persistent left sidebar on desktop and an off-canvas drawer on mobile. -->
+  <!-- Mobile bottom nav -->
+  <nav class="bottom-nav" aria-label="Mobile navigation">
+    <div class="bottom-nav-inner">
+      <button class="bnav-btn" data-act="tab" data-tab="dashboard" aria-selected="true">
+        <span class="bnav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </span>
+        Dashboard
+      </button>
+      <button class="bnav-btn" data-act="tab" data-tab="report" aria-selected="false">
+        <span class="bnav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </span>
+        Report
+      </button>
+      <button class="bnav-btn" data-act="tab" data-tab="history" aria-selected="false">
+        <span class="bnav-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+        </span>
+        History
+      </button>
+      <button class="bnav-btn" data-act="tab" data-tab="calendar" aria-selected="false"><span class="bnav-icon">▦</span>Calendar</button>
+      <button class="bnav-btn" data-act="tab" data-tab="money" aria-selected="false"><span class="bnav-icon">৳</span>Money</button>
+    </div>
+  </nav>
+
 </div><!-- /#app -->
 
 <div id="printRoot"></div>
