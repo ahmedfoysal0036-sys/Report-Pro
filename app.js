@@ -571,7 +571,7 @@ function renderDashboard(){
     ?recent.map(r=>`<tr>
         <td>${esc(r.date)}</td>
         <td><span class="badge b-${shiftKind(r.shift)}">${esc(label(r.shift||'DAY'))}</span></td>
-        <td>${(r.rows||[]).filter(rowFilled).length}</td>
+        <td><span class="activity-count-chip">${(r.rows||[]).filter(rowFilled).length}</span></td>
         <td class="${otClass(parseOT(r.ot))}" style="font-weight:700">${esc(r.ot||'0 hrs')}</td>
       </tr>`).join('')
     :'<tr><td colspan="4" style="text-align:center;color:var(--muted)">No reports found</td></tr>';

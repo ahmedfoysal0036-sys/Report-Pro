@@ -98,34 +98,19 @@
   <main class="container">
 
     <!-- DASHBOARD -->
-    <section id="view-dashboard" class="stack" hidden>
-      <div class="card stack">
-        <div class="toolbar">
-          <div>
-            <p class="page-kicker">Overview</p>
-            <h2 class="card-title">Dhanmondi SC Dashboard</h2>
-          </div>
-          <div class="spacer"></div>
-          <div class="field" style="width:140px">
-            <label for="dashYear">Year</label>
-            <select id="dashYear" aria-label="Dashboard year"></select>
-          </div>
-        </div>
+    <section id="view-dashboard" class="stack dashboard-layout" hidden>
+      <div class="card stack dashboard-stats-card">
+        <div class="dashboard-section-head"><div><p class="page-kicker">Overview</p><h2 class="card-title">Dhanmondi SC Dashboard</h2></div><span class="dashboard-card-dots" aria-hidden="true">•••</span></div>
         <div class="stats" id="dashboardStats"></div>
       </div>
-      <div class="card stack">
-        <h2 class="card-title">Monthly overtime</h2>
+      <div class="card stack dashboard-overtime-card">
+        <div class="toolbar dashboard-section-head"><div><p class="page-kicker">Annual activity</p><h2 class="card-title">Monthly overtime</h2></div><span class="spacer"></span><div class="field dashboard-year"><label for="dashYear">Year</label><select id="dashYear" aria-label="Dashboard year"></select></div><span class="dashboard-card-dots" aria-hidden="true">•••</span></div>
         <div class="bars" id="dashboardBars" role="img" aria-label="Monthly overtime overview"></div>
       </div>
-      <div id="personalDashboard" class="stack"></div>
-      <div class="card stack">
-        <h2 class="card-title">Recent reports</h2>
-        <div class="tbl-wrap">
-          <table class="data">
-            <thead><tr><th>Date</th><th>Shift</th><th>Activities</th><th>OT</th></tr></thead>
-            <tbody id="dashboardRecent"></tbody>
-          </table>
-        </div>
+      <div id="personalDashboard" class="stack dashboard-personal-card"></div>
+      <div class="card stack dashboard-recent-card">
+        <div class="dashboard-section-head"><div><p class="page-kicker">Latest activity</p><h2 class="card-title">Recent reports</h2></div><span class="dashboard-card-dots" aria-hidden="true">•••</span></div>
+        <div class="tbl-wrap"><table class="data dashboard-recent-table"><thead><tr><th>Date</th><th>Shift</th><th>Activities</th><th>OT</th></tr></thead><tbody id="dashboardRecent"></tbody></table></div>
       </div>
     </section>
 

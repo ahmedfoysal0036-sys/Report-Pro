@@ -220,8 +220,7 @@
           <div><small>Net after food expense</small><b>${money(due.net)}</b></div>
           <div><small>Running ${esc(ym)} OT (not yet payable)</small><b>${money(workMonthAmount.otAmount + workMonthAmount.holidayDays*HOLIDAY_RATE)}</b></div>
         </div>
-      </div>
-      <div class="card stack"><div class="toolbar"><h2 class="card-title">Salary-month income graph</h2><span class="spacer"></span><span class="muted">${esc(currentYear)}</span></div><div class="bars" id="incomeBars">${barHTML(salaryBars,'value',money)}</div><p class="muted small-note">Each month shows salary + OT from two months earlier + government holiday allowance + food allowance marked Paid. The current salary month is highlighted.</p></div>`;
+      <div class="dashboard-income-section"><div class="toolbar"><h2 class="card-title">Salary-month income graph</h2><span class="spacer"></span><span class="muted">${esc(currentYear)}</span></div><div class="bars" id="incomeBars">${barHTML(salaryBars,'value',money)}</div><p class="muted small-note">Each month shows salary + OT from two months earlier + government holiday allowance + food allowance marked Paid. The current salary month is highlighted.</p></div></div>`;
   }
   function fmtOTText(mins) {
     const h=Math.floor(mins/60), m=mins%60;
