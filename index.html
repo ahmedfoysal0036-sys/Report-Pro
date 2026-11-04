@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color">
 <meta name="description" content="Activity Tracker for Dhanmondi SC — daily reports, overtime, attendance and payroll.">
 <title>Activity Tracker · Dhanmondi SC</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -16,7 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script>try{var _t=localStorage.getItem('theme');if(_t!=='dark'&&_t!=='light')_t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',_t)}catch(e){}</script>
+<script>try{var reportProThemes=['light-lemon','light-olive','light-peach','light-orange','light-mint','dark-neon'];var reportProTheme=localStorage.getItem('reportpro-theme');if(!reportProThemes.includes(reportProTheme)){var oldReportProTheme=localStorage.getItem('theme');reportProTheme=oldReportProTheme==='dark'?'dark-neon':'light-mint';localStorage.setItem('reportpro-theme',reportProTheme);localStorage.removeItem('theme')}document.documentElement.setAttribute('data-theme',reportProTheme)}catch(e){document.documentElement.setAttribute('data-theme','light-mint')}</script>
 </head>
 <body>
 <a class="skip-link" href="#app">Skip to app</a>
@@ -404,6 +404,7 @@
 <datalist id="dl-team"></datalist>
 <datalist id="dl-site"></datalist>
 
+<script src="theme.js"></script>
 <script src="app.js"></script>
 <script src="personal.js"></script>
 </body>

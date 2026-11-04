@@ -232,19 +232,7 @@ function showTab(t){
   window.scrollTo(0,0);
 }
 function applyTheme(t){
-  document.documentElement.setAttribute('data-theme',t);
-  const isDark=t==='dark';
-  const label=isDark?'Switch to light theme':'Switch to dark theme';
-  const icon=isDark
-    ?'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>'
-    :'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1110.5 3 7 7 0 0021 14.5z"/></svg>';
-  document.querySelectorAll('[data-act="theme"]').forEach(btn=>{
-    btn.setAttribute('aria-label',label);
-    btn.title=label;
-    btn.innerHTML=icon;
-  });
-  const meta=document.querySelector('meta[name="theme-color"]');
-  if(meta)meta.setAttribute('content',isDark?'#070b16':'#4f46e5');
+  window.ReportProTheme?.apply(t);
 }
 
 /* ---------- Skeleton loaders ---------- */
@@ -681,13 +669,13 @@ async function exportPDF(){
   if(!window.jspdf||!window.html2canvas){toast('PDF tools failed to load.','error');return}
   showLoader('Creating PDF…');
   const host=document.createElement('div');
-  host.style.cssText='position:fixed;left:-10000px;top:0;background:#fff';
+  host.style.cssText='position:fixed;left:-10000px;top:0;background:var(--surface)';
   document.body.appendChild(host);
   try{
     const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
     for(let i=0;i<list.length;i++){
       host.innerHTML=reportHTML(list[i]);
-      const canvas=await html2canvas(host.firstElementChild,{scale:2,backgroundColor:'#ffffff'});
+      const canvas=await html2canvas(host.firstElementChild,{scale:2,backgroundColor:getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()});
       let w=297,h=canvas.height*297/canvas.width;
       if(h>210){h=210;w=canvas.width*210/canvas.height}
       if(i>0)pdf.addPage();
@@ -836,7 +824,7 @@ const actions={
   'reset-filters':()=>{['hSearch','dateFrom','dateTo'].forEach(i=>$(i).value='');$('hShift').value='all';renderHistory()},
   pdf:exportPDF,excel:exportExcel,print:printReports,
   'json-backup':exportJSON,restore:()=>$('restoreInput').click(),sync:syncNow,
-  theme:()=>{const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';applyTheme(t);store.set('theme',t)}
+  theme:b=>window.ReportProTheme?.toggleMenu(b)
 };
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
@@ -871,7 +859,7 @@ document.addEventListener('keydown',e=>{
 function init(){
   if(appInitialized){startCloud();return}
   appInitialized=true;
-  applyTheme(store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+  window.ReportProTheme?.applySaved();
   const opts=a=>a.map(x=>`<option value="${esc(x)}">`).join('');
   $('dl-client').innerHTML=opts(CLIENTS);$('dl-assign').innerHTML=opts(ASSIGN);$('dl-team').innerHTML=opts(TEAM);
   refreshData();showTab('dashboard');initDashboardYears();
@@ -904,7 +892,7 @@ $('resetPasswordBtn').addEventListener('click',async()=>{
   try{await auth.sendPasswordResetEmail(email);showAuthError('Password reset email sent if the account exists.')}catch(err){showAuthError(err.message)}
 });
 $('signOutBtn').addEventListener('click',async()=>{if(dirty&&!confirmDiscard())return;try{await auth.signOut()}catch(err){toast('Could not sign out: '+err.message,'error')}});
-applyTheme(store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+window.ReportProTheme?.applySaved();
 if(firebaseReady&&auth)auth.onAuthStateChanged(user=>{if(user)bootAuthenticatedUser(user);else bootSignedOut()});
 else{bootSignedOut();showAuthError('Setup required: configure Firebase and enable Email/Password sign-in in Firebase Console.')}
 })();
