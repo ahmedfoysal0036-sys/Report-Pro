@@ -616,3 +616,7 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{min-height:44px}
 @media(max-width:899px){.auth-wrap{padding:76px 24px 24px}.auth-shell{width:min(100%,430px);display:block;overflow:visible;border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}.auth-card{padding:30px 26px;background:color-mix(in srgb,var(--surface) 82%,transparent);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}.auth-brand-panel{display:none}}
 @media(max-width:480px){.auth-wrap{padding:72px 14px 20px}.auth-card{padding:26px 20px}.auth-card .auth-actions{gap:8px}.auth-card .auth-actions .btn{padding-inline:9px;font-size:12px}}
 @media(prefers-reduced-motion:reduce){.auth-card,.auth-panel-brand .brand-logo-img{animation:none}}
+
+/* Login alignment and fixed theme control */
+.auth-theme-btn{position:fixed;top:max(16px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));z-index:100}
+.auth-card{display:flex;flex-direction:column;justify-content:center}
