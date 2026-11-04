@@ -1,3 +1,4 @@
+
 {
   "rules": {
     "reports": {
@@ -5,6 +6,12 @@
       ".write": "auth != null",
       "$reportId": {
         ".validate": "newData.hasChildren(['id', 'date', 'shift'])"
+      }
+    },
+    "personalFinance": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
       }
     }
   }

@@ -1,3 +1,4 @@
+
 {
   "hosting": {
     "public": ".",
@@ -10,7 +11,11 @@
       "bot.js",
       "package.json",
       "package-lock.json",
-      "database.rules.json"
+      "database.rules.json",
+      "origin/**",
+      "tests/**",
+      "UPGRADE_NOTES_BN.md",
+      "FIREBASE_RULES_MERGE_SNIPPET.json"
     ],
     "headers": [
       {
