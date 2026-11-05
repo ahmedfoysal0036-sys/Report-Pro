@@ -620,3 +620,57 @@ input:not([type=checkbox]):not([type=radio]),select,textarea{min-height:44px}
 /* Login alignment and fixed theme control */
 .auth-theme-btn{position:fixed;top:max(16px,env(safe-area-inset-top));right:max(16px,env(safe-area-inset-right));z-index:100}
 .auth-card{display:flex;flex-direction:column;justify-content:center}
+
+/* Horizon shell and Dashboard widgets — app only, login remains unchanged */
+#app{font-family:"DM Sans",var(--font)}
+.app-shell{position:relative;min-height:100vh;display:flex;min-width:0}
+.app-sidebar{position:fixed;inset:0 auto 0 0;z-index:50;width:248px;display:flex;flex-direction:column;padding:28px 16px 20px;background:var(--surface);border-right:1px solid var(--border);box-shadow:var(--shadow-sm);color:var(--text);transition:transform .22s ease}
+.sidebar-brand{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;color:var(--text);font-size:16px;font-weight:800;letter-spacing:-.03em;white-space:nowrap}
+.sidebar-brand .brand-logo-img{width:40px;height:40px;min-width:40px;min-height:40px;max-width:40px;max-height:40px;border-radius:13px;animation:none}
+.sidebar-brand small{display:block;margin-top:2px;color:var(--muted);font-size:11px;font-weight:500;letter-spacing:0}
+.sidebar-divider{height:1px;flex:none;margin:24px 8px 20px;background:var(--border)}
+.app-sidebar .sidebar-tabs{display:flex;flex-direction:column;align-items:stretch;gap:6px;width:auto;padding:0;border:0;background:transparent}
+.app-sidebar .sidebar-tabs button{position:relative;display:flex;align-items:center;justify-content:flex-start;gap:14px;width:100%;min-height:48px;padding:0 14px;border:0;border-radius:14px;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:600;text-align:left;box-shadow:none}
+.app-sidebar .sidebar-tabs button:hover{background:var(--surface-2);color:var(--text)}
+.app-sidebar .sidebar-tabs button[aria-selected="true"]{background:var(--primary-soft);color:var(--primary);font-weight:700;box-shadow:none}
+.app-sidebar .sidebar-tabs button[aria-selected="true"]::after{content:"";position:absolute;top:9px;right:-16px;bottom:9px;width:3px;border-radius:var(--radius-pill);background:var(--primary)}
+.sidebar-icon{width:20px;height:20px;flex:none;color:currentColor}
+.app-main{flex:1;min-width:0;margin-left:248px}
+.topbar{background:color-mix(in srgb,var(--surface) 94%,transparent);border-bottom:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.topbar-in{max-width:none;min-height:92px;margin:0;padding:14px 28px;gap:20px;flex-wrap:nowrap}
+.navbar-heading{flex:1;min-width:0}
+.breadcrumb{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:12px;font-weight:500;line-height:1.3}
+.current-page-title{margin:3px 0 0;color:var(--text);font-size:27px;font-weight:800;letter-spacing:-.045em;line-height:1.2}
+.navbar-controls{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;flex-wrap:wrap}
+.navbar-controls #syncPill{white-space:nowrap}
+.navbar-controls #currentUser{max-width:150px}
+.sidebar-toggle{display:none}
+#app .container{width:100%;max-width:1500px;margin:0;padding:26px 28px 112px}
+#app .card{border-radius:20px;box-shadow:var(--shadow-sm)}
+#app .card:hover{box-shadow:var(--shadow)}
+.dashboard-layout{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-areas:"dash-heading dash-heading dash-heading dash-heading" "stats stats stats stats" "overtime overtime overtime overtime" "personal personal recent recent";gap:18px;align-items:stretch}
+.dashboard-stats-card{display:contents;grid-area:auto}
+.dashboard-stats-card>.dashboard-section-head{grid-area:dash-heading;min-height:34px;padding:0 2px}
+.dashboard-stats-card>#dashboardStats{grid-area:stats;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-content:start;min-width:0}
+#dashboardStats .stat{min-width:0;min-height:88px;padding:15px 12px 15px 66px;border:1px solid var(--border);border-radius:20px;background:var(--surface);box-shadow:var(--shadow-sm);transition:transform .18s ease,box-shadow .18s ease}
+#dashboardStats .stat::before{content:"";position:absolute;left:14px;top:50%;bottom:auto;width:40px;height:40px;border:0;border-radius:50%;background:var(--primary-soft);transform:translateY(-50%)}
+#dashboardStats .stat::after{position:absolute;left:14px;top:50%;display:grid;width:40px;height:40px;place-items:center;color:var(--primary);font-size:17px;font-weight:800;line-height:1;transform:translateY(-50%)}
+#dashboardStats .stat:nth-child(1)::after{content:"▤"}#dashboardStats .stat:nth-child(2)::after{content:"◷"}#dashboardStats .stat:nth-child(3)::after{content:"↗"}#dashboardStats .stat:nth-child(4)::after{content:"◉"}#dashboardStats .stat:nth-child(5)::after{content:"▦"}#dashboardStats .stat:nth-child(6)::after{content:"↔"}#dashboardStats .stat:nth-child(7)::after{content:"⌑"}#dashboardStats .stat:nth-child(8)::after{content:"○"}
+#dashboardStats .stat:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+#dashboardStats .stat b{font-size:21px;overflow-wrap:anywhere}
+#dashboardStats .stat span{display:block;font-size:11px;line-height:1.35}
+.dashboard-overtime-card{grid-area:overtime;min-width:0;padding:22px 24px 18px;border-radius:24px!important;box-shadow:var(--shadow)!important}
+.dashboard-personal-card{grid-area:personal;min-width:0;align-self:stretch}
+.dashboard-personal-card>.card{height:100%;min-width:0;border-radius:20px;box-shadow:var(--shadow-sm)}
+.dashboard-recent-card{grid-area:recent;min-width:0;align-self:stretch;border-radius:20px;box-shadow:var(--shadow-sm)}
+.dashboard-recent-card .tbl-wrap{max-width:100%;min-width:0;overflow-x:auto}
+.dashboard-recent-table{width:100%;max-width:100%;table-layout:fixed}
+[data-theme="dark-neon"] .app-sidebar{box-shadow:var(--shadow),0 0 24px color-mix(in srgb,var(--accent) 6%,transparent)}
+[data-theme="dark-neon"] .app-sidebar .sidebar-tabs button[aria-selected="true"]{box-shadow:var(--glow)}
+[data-theme="dark-neon"] #dashboardStats .stat{background:color-mix(in srgb,var(--surface) 90%,transparent);box-shadow:var(--shadow-sm),0 0 14px color-mix(in srgb,var(--accent) 5%,transparent)}
+@media(max-width:1199px){.dashboard-layout{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"dash-heading dash-heading" "stats stats" "overtime overtime" "personal personal" "recent recent"}.dashboard-stats-card>#dashboardStats{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:991px){.app-sidebar{width:min(292px,calc(100vw - 52px));transform:translateX(-105%);box-shadow:var(--shadow-lg)}#app:has(.sidebar-toggle-check:checked) .app-sidebar{transform:translateX(0)}.app-shell:has(.sidebar-toggle-check:checked)::before{content:"";position:fixed;inset:0;z-index:49;background:var(--overlay)}.app-main{margin-left:0}.sidebar-toggle{position:relative;display:grid;flex:none;width:44px;height:44px;place-items:center;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);cursor:pointer;box-shadow:var(--shadow-sm)}.sidebar-toggle svg{width:21px;height:21px}.sidebar-toggle-check{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;margin:0!important;padding:0!important;opacity:0;clip-path:inset(50%)}.sidebar-toggle:focus-within{box-shadow:var(--ring)}.topbar-in{gap:12px;padding-inline:22px}.dashboard-layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"dash-heading" "stats" "overtime" "personal" "recent"}.dashboard-stats-card>#dashboardStats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){#app .topbar-in{display:grid;grid-template-columns:44px minmax(0,1fr);gap:8px 12px;padding:10px 14px}.navbar-heading{grid-column:2;grid-row:1}.current-page-title{font-size:22px}.navbar-controls{grid-column:1/-1;grid-row:2;justify-content:flex-start;gap:6px}.navbar-controls #currentUser{display:none}.#app .container{padding:18px 14px 112px}.dashboard-overtime-card{padding:17px 14px 14px}.dashboard-stats-card>.dashboard-section-head{padding-inline:1px}.dashboard-stats-card>#dashboardStats{gap:9px}.dashboard-layout{gap:14px}}
+@media(max-width:390px){.navbar-controls{gap:5px}.navbar-controls .btn{padding-inline:9px}.dashboard-stats-card>#dashboardStats{gap:8px}#dashboardStats .stat{padding-left:58px;padding-right:8px}#dashboardStats .stat::before,#dashboardStats .stat::after{left:10px;width:38px;height:38px}#app .container{padding-inline:12px}}
+@media(prefers-reduced-motion:reduce){.app-sidebar,#dashboardStats .stat{transition:none}}
+@media(max-width:991px){.app-sidebar{visibility:hidden;pointer-events:none;transition:transform .22s ease,visibility .22s ease}#app:has(.sidebar-toggle-check:checked) .app-sidebar{visibility:visible;pointer-events:auto}}
