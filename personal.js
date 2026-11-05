@@ -254,7 +254,7 @@
         if(isDuty(r))duty++; else if(kind==='leave')leave++; else off++;
         if(reportIsHolidayDuty(r))label += ' + Gov duty';
       } else if(expected){kind='missing';label='Missing report';missing++;}
-      cells.push(`<div class="cal-cell cal-${kind}" title="${date} — ${esc(label)}"><strong>${d}</strong><span>${esc(label)}</span>${r&&reportIsHolidayDuty(r)?'<i>৳900</i>':''}</div>`);
+      cells.push(`<div class="cal-cell cal-${kind}" data-date="${date}" role="button" tabindex="0" title="${date} — ${esc(label)}"><strong>${d}</strong><span>${esc(label)}</span>${r&&reportIsHolidayDuty(r)?'<i>৳900</i>':''}</div>`);
     }
     const attendance = scheduledCount ? Math.round(duty/scheduledCount*100) : null;
     const maxStreak = consecutiveDutyStreak(readReports());
@@ -442,6 +442,24 @@
   window.renderPersonalDashboard=renderPersonalDashboard;
   window.renderPersonalCalendar=renderPersonalCalendar;
   window.renderPersonalMoney=renderPersonalMoney;
+  window.getCalendarDaySnapshot=date=>{
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date||'')))return null;
+    const report=readReports().find(r=>r.date===date)||null;
+    const expected=finance.expectedWeekdays.includes(new Date(`${date}T12:00:00`).getDay());
+    const dutyStatus=report
+      ? reportIsHolidayDuty(report)&&isDuty(report)?'Government holiday duty':isDuty(report)?'Working day':shiftKind(report)==='Leave'?'Leave':'Off day'
+      : expected?'Missing report':'Off day';
+    const snapshot={
+      date,dutyStatus,expected,report,
+      finance:{
+        profiles:finance.profiles.filter(x=>!x.deleted&&x.effectiveFrom===date),
+        foodAllowances:finance.foodAllowances.filter(x=>!x.deleted&&x.date===date),
+        foodExpenses:finance.foodExpenses.filter(x=>!x.deleted&&x.date===date),
+        journeys:finance.journeys.filter(x=>!x.deleted&&x.date===date)
+      }
+    };
+    return JSON.parse(JSON.stringify(snapshot));
+  };
   window.importPersonalFinanceBackup=payload=>{
     try {
       const incoming=normalizeFinance(payload);
