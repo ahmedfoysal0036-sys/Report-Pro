@@ -94,19 +94,30 @@
   <main class="container">
 
     <!-- DASHBOARD -->
-    <section id="view-dashboard" class="stack dashboard-layout" hidden>
-      <div class="card stack dashboard-stats-card">
-        <div class="dashboard-section-head"><div><p class="page-kicker">Overview</p><h2 class="card-title">Dhanmondi SC Dashboard</h2></div><span class="dashboard-card-dots" aria-hidden="true">•••</span></div>
-        <div class="stats" id="dashboardStats"></div>
+    <section id="view-dashboard" class="dash" hidden>
+      <div class="dash-top">
+        <div><p class="page-kicker">Overview</p><h2 class="card-title">Dhanmondi SC Dashboard</h2></div>
+        <div class="field dash-year"><label for="dashYear">Year</label><select id="dashYear" aria-label="Dashboard year"></select></div>
       </div>
-      <div class="card stack dashboard-overtime-card">
-        <div class="toolbar dashboard-section-head"><div><p class="page-kicker">Annual activity</p><h2 class="card-title">Monthly overtime</h2></div><span class="spacer"></span><div class="field dashboard-year"><label for="dashYear">Year</label><select id="dashYear" aria-label="Dashboard year"></select></div><span class="dashboard-card-dots" aria-hidden="true">•••</span></div>
-        <div class="bars" id="dashboardBars" role="img" aria-label="Monthly overtime overview"></div>
+      <div id="personalDashboard" class="dash-hero-grid"></div>
+      <div>
+        <div class="dash-block-head"><h3>Year summary</h3><span id="dashYearTag" class="muted"></span></div>
+        <div class="dash-stats" id="dashStats"></div>
       </div>
-      <div id="personalDashboard" class="stack dashboard-personal-card"></div>
-      <div class="card stack dashboard-recent-card">
-        <div class="dashboard-section-head"><div><p class="page-kicker">Latest activity</p><h2 class="card-title">Recent reports</h2></div><span class="dashboard-card-dots" aria-hidden="true">•••</span></div>
-        <div class="tbl-wrap"><table class="data dashboard-recent-table"><thead><tr><th>Date</th><th>Shift</th><th>Activities</th><th>OT</th></tr></thead><tbody id="dashboardRecent"></tbody></table></div>
+      <div class="dash-charts">
+        <div class="card dash-chart">
+          <div class="dash-card-head"><div><p class="page-kicker">Annual activity</p><h2 class="card-title">Monthly overtime</h2></div></div>
+          <div class="bars" id="dashboardBars" role="img" aria-label="Monthly overtime overview"></div>
+        </div>
+        <div class="card dash-chart">
+          <div class="dash-card-head"><div><p class="page-kicker">Payroll</p><h2 class="card-title">Salary-month income</h2></div></div>
+          <div class="bars" id="incomeBars" role="img" aria-label="Income per salary month"></div>
+          <p class="muted small-note">Salary + OT from two months earlier + government holiday allowance. The current salary month is highlighted.</p>
+        </div>
+      </div>
+      <div class="card dash-table-card">
+        <div class="dash-card-head"><div><p class="page-kicker">Latest activity</p><h2 class="card-title">Recent reports</h2></div><button class="btn btn-sm" data-act="tab" data-tab="history">View all</button></div>
+        <div class="tbl-wrap"><table class="dash-table"><thead><tr><th>Date</th><th>Shift</th><th>Time</th><th>Activities</th><th>OT</th></tr></thead><tbody id="dashboardRecent"></tbody></table></div>
       </div>
     </section>
 
@@ -123,15 +134,15 @@
         <span id="dirtyChip" class="chip" hidden>Unsaved changes</span>
         <div class="spacer"></div>
         <button class="btn" data-act="new">New report</button>
-        <button class="btn" data-act="copy-last">Copy last</button>
         <button class="btn btn-primary" data-act="save" title="Ctrl + S">Save report</button>
       </div>
 
       <div id="reportForm" class="stack">
         <input type="hidden" id="editingId">
-        <div class="card">
-          <div class="grid g2">
-            <div class="grid">
+        <div class="card form-card">
+          <div class="form-sections">
+            <div class="form-section">
+              <h3 class="form-section-title">Employee</h3>
               <div class="field"><label for="assignedBy">SC head</label><input id="assignedBy"></div>
               <div class="field"><label for="userName">Name</label><input id="userName"></div>
               <div class="grid g2">
@@ -139,35 +150,36 @@
                 <div class="field"><label for="userDesig">Designation</label><input id="userDesig"></div>
               </div>
             </div>
-            <div class="grid">
-              <div class="grid g3">
+            <div class="form-section">
+              <h3 class="form-section-title">Duty</h3>
+              <div class="grid g3 time-grid">
                 <div class="field"><label for="reportDate">Date</label><input type="date" id="reportDate"></div>
                 <div class="field"><label for="startTime">From</label><input type="time" id="startTime"></div>
                 <div class="field"><label for="endTime">To</label><input type="time" id="endTime"></div>
               </div>
-              <div class="grid g2">
-                <div class="field"><label for="otHours">Overtime today</label><input id="otHours" readonly value="0 hrs"></div>
-                <div class="field"><span class="lbl">Shift</span>
-                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-                    <div class="seg" role="radiogroup" aria-label="Shift">
-                      <label><input type="radio" name="shift" id="shiftDay" checked>Day</label>
-                      <label><input type="radio" name="shift" id="shiftNight">Night</label>
-                      <label><input type="radio" name="shift" id="shiftOff">Off duty</label>
-                    </div>
-                    <select id="offType" aria-label="Off duty type" hidden style="width:auto">
-                      <option value="Weekly Holiday">Weekly Holiday</option>
-                      <option value="Goverment Holiday">Government holiday</option>
-                      <option value="Shifting">Shifting</option>
-                      <option value="Duty Shifting">Duty Shifting</option>
-                      <option value="Sick Leave">Sick leave</option>
-                      <option value="Plan leave">Plan leave</option>
-                      <option value="Anual leave">Annual leave</option>
-                      <option value="Casual leave">Casual leave</option>
-                      <option value="Off day">Off day</option>
-                    </select>
+              <div class="field"><span class="lbl">Shift</span>
+                <div class="shift-row">
+                  <div class="seg" role="radiogroup" aria-label="Shift">
+                    <label><input type="radio" name="shift" id="shiftDay" checked>Day</label>
+                    <label><input type="radio" name="shift" id="shiftNight">Night</label>
+                    <label><input type="radio" name="shift" id="shiftOff">Off duty</label>
                   </div>
-                  <label class="inline-check holiday-duty-check"><input type="checkbox" id="governmentHolidayDuty"> Government holiday duty (৳900 fixed allowance)</label>
+                  <select id="offType" aria-label="Off duty type" hidden>
+                    <option value="Weekly Holiday">Weekly Holiday</option>
+                    <option value="Goverment Holiday">Government holiday</option>
+                    <option value="Shifting">Shifting</option>
+                    <option value="Duty Shifting">Duty Shifting</option>
+                    <option value="Sick Leave">Sick leave</option>
+                    <option value="Plan leave">Plan leave</option>
+                    <option value="Anual leave">Annual leave</option>
+                    <option value="Casual leave">Casual leave</option>
+                    <option value="Off day">Off day</option>
+                  </select>
                 </div>
+              </div>
+              <div class="grid g2 duty-extra">
+                <div class="field"><label for="otHours">Overtime today</label><input id="otHours" readonly value="0 hrs"></div>
+                <label class="inline-check holiday-duty-check"><input type="checkbox" id="governmentHolidayDuty"> Government holiday duty (৳900 fixed allowance)</label>
               </div>
             </div>
           </div>
@@ -179,13 +191,13 @@
 
     <!-- HISTORY -->
     <section id="view-history" class="stack" hidden>
-      <div class="card stack">
-          <div>
-            <p class="page-kicker">Archive</p>
-            <h2 class="card-title">Find reports</h2>
-          </div>
-        <div class="grid g4">
-          <div class="field"><label for="hSearch">Search</label><input id="hSearch" type="search" placeholder="Site, client, activity…"></div>
+      <div class="card stack history-filter">
+        <div class="dash-card-head">
+          <div><p class="page-kicker">Archive</p><h2 class="card-title">Find reports</h2></div>
+          <button class="btn btn-sm" data-act="reset-filters">Reset filters</button>
+        </div>
+        <div class="filter-grid">
+          <div class="field field-search"><label for="hSearch">Search</label><input id="hSearch" type="search" placeholder="Site, client, activity…"></div>
           <div class="field"><label for="hShift">Shift</label>
             <select id="hShift">
               <option value="all">All shifts</option>
@@ -198,16 +210,15 @@
           <div class="field"><label for="dateFrom">From</label><input type="date" id="dateFrom"></div>
           <div class="field"><label for="dateTo">To</label><input type="date" id="dateTo"></div>
         </div>
-        <div class="stats">
-          <div class="stat"><b id="sCount">0</b><span>Reports found</span></div>
-          <div class="stat"><b id="sOt">0 hrs</b><span>Total overtime</span></div>
-          <div class="stat"><b id="sRange">All dates</b><span>Range</span></div>
+        <div class="filter-stats">
+          <div class="fstat"><span>Reports found</span><b id="sCount">0</b></div>
+          <div class="fstat"><span>Total overtime</span><b id="sOt">0 hrs</b></div>
+          <div class="fstat"><span>Range</span><b id="sRange">All dates</b></div>
         </div>
       </div>
       <div class="toolbar">
         <h2 class="card-title">Saved reports</h2>
         <div class="spacer"></div>
-        <button class="btn btn-sm" data-act="reset-filters">Reset filters</button>
         <button class="btn btn-sm" id="selBtn" data-act="select-all">Select all</button>
         <button class="btn btn-sm btn-danger" id="delSelBtn" data-act="del-selected" disabled>Delete selected</button>
       </div>
@@ -265,7 +276,7 @@
       </div>
     </section>
 
-    <!-- PERSONAL FINANCE, ALLOWANCE, EXPENSE & JOURNEY -->
+    <!-- PAYROLL & APPRAISAL -->
     <section id="view-money" class="stack" hidden>
       <div class="card stack">
         <div class="toolbar"><div><p class="page-kicker">Payroll</p><h2 class="card-title">Salary &amp; OT Payout</h2></div><span class="spacer"></span><button class="btn btn-icon" id="moneyPrev" type="button" aria-label="Previous salary month">‹</button><input type="month" id="moneyMonth" aria-label="Salary month" style="max-width:160px"><button class="btn btn-icon" id="moneyNext" type="button" aria-label="Next salary month">›</button></div>
@@ -273,59 +284,15 @@
         <p id="financeSyncStatus" class="muted small-note">Finance data is stored separately from daily reports.</p>
       </div>
       <div class="card stack">
-        <h2 class="card-title">Appraisal &amp; Rate History</h2>
+        <div><p class="page-kicker">Rates</p><h2 class="card-title">Appraisal &amp; Rate History</h2></div>
         <p class="muted small-note">Add a new effective date after appraisal. Salary and hourly OT rate are both versioned; previous work-month OT retains its historic rate. Salary is not prorated for a mid-month appraisal.</p>
-        <form id="profileForm" class="grid g3">
+        <form id="profileForm" class="appraisal-form">
           <div class="field"><label for="profileDate">Effective from</label><input id="profileDate" name="effectiveFrom" type="date" required></div>
           <div class="field"><label for="profileSalary">Monthly salary (৳)</label><input id="profileSalary" name="salary" type="number" min="0" step="0.01" placeholder="Enter salary" required></div>
           <div class="field"><label for="profileOtRate">OT rate / hour (৳)</label><input id="profileOtRate" name="otRate" type="number" min="0" step="0.01" value="235" required></div>
-          <div class="field"><button class="btn btn-primary" type="submit">Save appraisal rate</button></div>
+          <div class="field field-action"><button class="btn btn-primary" type="submit">Save appraisal rate</button></div>
         </form>
         <div id="profileList" class="finance-list"></div>
-      </div>
-      <div class="card stack">
-        <h2 class="card-title">Food Allowance &amp; Online Bill Reference</h2>
-        <p class="muted small-note">Manual entry for out-of-Dhaka travel (100 km or more). Allowance can be entered whenever received or submitted. Use Reference No. to track the online bill.</p>
-        <form id="allowanceForm" class="grid g3">
-          <div class="field"><label for="allowanceDate">Date</label><input id="allowanceDate" name="date" type="date" required></div>
-          <div class="field"><label>Location</label><input name="location" placeholder="Where did you travel?"></div>
-          <div class="field"><label>Distance (KM)</label><input name="distanceKm" type="number" min="0" step="0.1" placeholder="100 or more"></div>
-          <div class="field"><label>Allowance amount (৳)</label><input name="amount" type="number" min="0.01" step="0.01" required></div>
-          <div class="field"><label>Online bill Reference No.</label><input name="referenceNo" placeholder="Bill / reference number"></div>
-          <div class="field"><label>Status</label><select name="status"><option value="pending">Pending</option><option value="submitted">Submitted</option><option value="paid">Paid / Received</option></select></div>
-          <div class="field"><label>Remarks</label><input name="remarks" placeholder="Optional notes"></div>
-          <div class="field"><button class="btn btn-primary" type="submit">Add food allowance</button></div>
-        </form>
-        <div id="allowanceList" class="finance-list"></div>
-      </div>
-      <div class="card stack">
-        <h2 class="card-title">Food Expense</h2>
-        <p class="muted small-note">Food expenses are separate from Food Allowance and reduce the net balance; they are never counted as income.</p>
-        <form id="expenseForm" class="grid g3">
-          <div class="field"><label for="expenseDate">Date</label><input id="expenseDate" name="date" type="date" required></div>
-          <div class="field"><label>Amount (৳)</label><input name="amount" type="number" min="0.01" step="0.01" required></div>
-          <div class="field"><label>Location</label><input name="location" placeholder="Location"></div>
-          <div class="field"><label>Food details</label><input name="details" placeholder="Meal / food details"></div>
-          <div class="field"><label>Remarks</label><input name="remarks" placeholder="Optional notes"></div>
-          <div class="field"><button class="btn btn-primary" type="submit">Add food expense</button></div>
-        </form>
-        <div id="expenseList" class="finance-list"></div>
-      </div>
-      <div class="card stack">
-        <h2 class="card-title">Daily Journey Log</h2>
-        <p class="muted small-note">Record each movement. You can add multiple journeys on the same day.</p>
-        <form id="journeyForm" class="grid g3">
-          <div class="field"><label for="journeyDate">Journey date</label><input id="journeyDate" name="date" type="date" required></div>
-          <div class="field"><label>From</label><input name="from" required placeholder="Starting location"></div>
-          <div class="field"><label>To</label><input name="to" required placeholder="Destination"></div>
-          <div class="field"><label>Client / Site</label><input name="client" placeholder="Client or site name"></div>
-          <div class="field"><label>Distance (KM)</label><input name="distanceKm" type="number" min="0" step="0.1"></div>
-          <div class="field"><label>Purpose</label><input name="purpose" placeholder="Why did you travel?"></div>
-          <div class="field"><label>Transport</label><input name="transport" placeholder="Bus, CNG, car, etc."></div>
-          <div class="field"><label>Remarks</label><input name="remarks" placeholder="Optional notes"></div>
-          <div class="field"><button class="btn btn-primary" type="submit">Add journey</button></div>
-        </form>
-        <div id="journeyList" class="finance-list"></div>
       </div>
     </section>
 
