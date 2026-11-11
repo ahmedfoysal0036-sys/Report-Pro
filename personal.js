@@ -184,7 +184,10 @@
     const now = today(), ym = monthNow();
     const sel = ($('dashYear') && $('dashYear').value) || now.slice(0,4);
     const monthName = months[Number(ym.slice(5)) - 1];
-    const todayMins = reports.filter(r => r.date === now).reduce((n,r)=>n+parseOT(r.ot),0);
+    const todayRows = reports.filter(r => r.date === now);
+    const todayMins = todayRows.reduce((n,r)=>n+parseOT(r.ot),0);
+    const todayHolidayDays = todayRows.filter(r => reportIsHolidayDuty(r) && isDuty(r)).length;
+    const todayValue = todayRows.reduce((n,r)=>n+getOTAmount(r),0) + todayHolidayDays * HOLIDAY_RATE;
     const monthRows = reports.filter(r => r.date.startsWith(ym));
     const yearRows = reports.filter(r => r.date.startsWith(sel + '-'));
     const monthMins = monthRows.reduce((n,r)=>n+parseOT(r.ot),0);
@@ -204,14 +207,13 @@
         <div class="mini-grid">
           <div><small>Monthly salary</small><b>${money(due.salary)}</b></div>
           <div><small>Estimated total income</small><b>${money(due.totalIncome)}</b></div>
-          <div><small>Running ${esc(ym)} OT (not yet payable)</small><b>${money(running)}</b></div>
         </div>
       </div>
       <div class="card">
         <div class="dash-card-head"><div><p class="page-kicker">Overtime</p><h2 class="card-title">Today &amp; this month</h2></div></div>
         <div class="kv-list">
-          <div class="kv-row"><div class="k"><b>Today</b><small>${esc(now)}</small></div><div class="v">${esc(fmtOTText(todayMins))}<small>${money(getOTAmount({date:now,ot:formatOT(todayMins)}))}</small></div></div>
-          <div class="kv-row"><div class="k"><b>${esc(monthName)}</b><small>Current work month</small></div><div class="v">${esc(fmtOTText(monthMins))}<small>${money(monthOTValue)}</small></div></div>
+          <div class="kv-row"><div class="k"><b>Today</b><small>${esc(now)}</small></div><div class="v">${esc(fmtOTText(todayMins))}<small>${money(todayValue)}</small></div></div>
+          <div class="kv-row"><div class="k"><b>${esc(monthName)}</b><small>Running payable${monthHolidayDays ? ' (OT + holiday)' : ''}</small></div><div class="v">${esc(fmtOTText(monthMins))}<small>${money(running)}</small></div></div>
           <div class="kv-row"><div class="k"><b>${esc(sel)} total</b><small>Selected year</small></div><div class="v">${esc(fmtOTText(yearMins))}<small>${money(yearOTValue)}</small></div></div>
           <div class="kv-row"><div class="k"><b>Highest OT day</b><small>${esc(sel)}</small></div><div class="v">${peak ? esc(fmtOTText(parseOT(peak.ot))) : '—'}<small>${peak ? esc(peak.date) : 'No OT recorded'}</small></div></div>
         </div>
