@@ -15,6 +15,12 @@
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   };
+  const moneyShort = value => {
+    const v = Number(value) || 0;
+    if (v <= 0) return '';
+    if (v >= 1000) { const k = v / 1000; return '৳' + (k >= 100 ? Math.round(k) : Math.round(k * 10) / 10) + 'k'; }
+    return '৳' + Math.round(v);
+  };
   const monthNow = () => today().slice(0,7);
   const id = () => `${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
   const parseJSON = (raw, fallback) => { try { const v = JSON.parse(raw); return v == null ? fallback : v; } catch (_) { return fallback; } };
@@ -147,10 +153,8 @@
     const salaryProfile = getProfileFromProfiles(d.profiles, lastDateOfMonth(salaryMonth));
     const salary = Number(salaryProfile.monthlySalary) || 0;
     const holidayAmount = holidayDays * HOLIDAY_RATE;
-    const foodReceived = d.foodAllowances.filter(x => !x.deleted && x.date && x.date.startsWith(salaryMonth) && x.status === 'paid').reduce((n,x)=>n+(Number(x.amount)||0),0);
-    const foodExpense = d.foodExpenses.filter(x => !x.deleted && x.date && x.date.startsWith(salaryMonth)).reduce((n,x)=>n+(Number(x.amount)||0),0);
-    const totalIncome = salary + otAmount + holidayAmount + foodReceived;
-    return {salaryMonth,workMonth,reports,otMinutes,otAmount,holidayDays,holidayAmount,salary,foodReceived,foodExpense,totalIncome,net:totalIncome-foodExpense};
+    const totalIncome = salary + otAmount + holidayAmount;
+    return {salaryMonth,workMonth,reports,otMinutes,otAmount,holidayDays,holidayAmount,salary,totalIncome};
   }
   function payoutForMonth(salaryMonth) { return buildPayoutSummary(readReports(), finance, salaryMonth); }
   function runningWorkMonth(ym) {
@@ -164,12 +168,12 @@
   function maxOTDay(reports) {
     return reports.reduce((best,r)=>parseOT(r.ot) > (best ? parseOT(best.ot) : 0) ? r : best, null);
   }
-  function barHTML(items, key, formatter, maxValue) {
+  function barHTML(items, key, labelFmt, titleFmt) {
     const max = Math.max(1, ...items.map(x => Number(x[key])||0));
     return items.map(x => {
       const value = Number(x[key])||0;
-      const height = Math.max(3, Math.round(value / max * 150));
-      return `<div class="bar-col" title="${esc(x.label)}: ${esc(formatter(value))}"><div class="bar-val">${esc(formatter(value))}</div><div class="bar${x.current?' bar-current':''}" style="height:${height}px"></div><div class="bar-lbl">${esc(x.short||x.label.slice(0,3))}</div></div>`;
+      const height = Math.max(3, Math.round(value / max * 170));
+      return `<div class="bar-col" title="${esc(x.label)}: ${esc(titleFmt(value))}"><div class="bar-val">${esc(labelFmt(value))}</div><div class="bar${x.current?' bar-current':''}" style="height:${height}px"></div><div class="bar-lbl">${esc(x.short||x.label.slice(0,3))}</div></div>`;
     }).join('');
   }
 
@@ -177,50 +181,50 @@
     const mount = $('personalDashboard');
     if (!mount) return;
     const reports = readReports();
-    const now = today(), ym = monthNow(), y = now.slice(0,4);
-    const todays = reports.filter(r => r.date === now);
+    const now = today(), ym = monthNow();
+    const sel = ($('dashYear') && $('dashYear').value) || now.slice(0,4);
+    const monthName = months[Number(ym.slice(5)) - 1];
+    const todayMins = reports.filter(r => r.date === now).reduce((n,r)=>n+parseOT(r.ot),0);
     const monthRows = reports.filter(r => r.date.startsWith(ym));
-    const yearRows = reports.filter(r => r.date.startsWith(y+'-'));
-    const todayMins = todays.reduce((n,r)=>n+parseOT(r.ot),0);
+    const yearRows = reports.filter(r => r.date.startsWith(sel + '-'));
     const monthMins = monthRows.reduce((n,r)=>n+parseOT(r.ot),0);
     const yearMins = yearRows.reduce((n,r)=>n+parseOT(r.ot),0);
-    const holidayMonthDays = monthRows.filter(r=>reportIsHolidayDuty(r)&&isDuty(r)).length;
-    const workMonthAmount = runningWorkMonth(ym);
-    const due = payoutForMonth(ym);
-    const dutyDays = yearRows.filter(isDuty).length;
-    const offDays = yearRows.filter(r=>!isDuty(r)&&shiftKind(r)!=='Leave').length;
+    const monthOTValue = monthRows.reduce((n,r)=>n+getOTAmount(r),0);
+    const yearOTValue = yearRows.reduce((n,r)=>n+getOTAmount(r),0);
+    const monthHolidayDays = monthRows.filter(r => reportIsHolidayDuty(r) && isDuty(r)).length;
+    const running = monthOTValue + monthHolidayDays * HOLIDAY_RATE;
+    const due = buildPayoutSummary(reports, finance, ym);
     const peak = maxOTDay(yearRows);
-    const currentYear = $('dashYear')?.value || y;
-    const salaryBars = months.map((name,i)=>{
-      const salaryMonth = `${currentYear}-${String(i+1).padStart(2,'0')}`;
-      const summary = payoutForMonth(salaryMonth);
-      return {label:name,short:name.slice(0,3),value:summary.totalIncome,current:salaryMonth===ym};
-    });
-    const topCards = [
-      [money(getOTAmount({date:now,ot:formatOT(todayMins)})), 'Today OT amount'],
-      [fmtOTText(todayMins), 'Today OT hours'],
-      [fmtOTText(monthMins), `${months[new Date().getMonth()]} OT hours`],
-      [money(monthRows.reduce((n,r)=>n+getOTAmount(r),0)), 'Current work-month OT value'],
-      [fmtOTText(yearMins), `${y} total OT hours`],
-      [money(yearRows.reduce((n,r)=>n+getOTAmount(r),0)), `${y} total OT value`],
-      [dutyDays, 'Recorded duty days this year'],
-      [offDays, 'Recorded off days this year'],
-      [peak ? `${peak.date} · ${fmtOTText(parseOT(peak.ot))}` : '—', 'Highest OT day']
-    ];
+    const dayWord = due.holidayDays === 1 ? 'day' : 'days';
+
     mount.innerHTML = `
-      <div class="card stack">
-        <div class="toolbar"><h2 class="card-title">Salary &amp; payable OT overview</h2><span class="spacer"></span><span class="badge b-day">Salary month: ${esc(months[Number(ym.slice(5))-1])}</span></div>
-        <div class="payroll-hero"><span>Payable for ${esc(due.workMonth)} work-month</span><strong>${money(due.otAmount + due.holidayAmount)}</strong><small>Regular OT ${money(due.otAmount)} + Government holiday ${money(due.holidayAmount)} (${due.holidayDays} day)</small></div>
-        <div class="stats personal-stats">${topCards.map(([v,l])=>`<div class="stat"><b>${esc(String(v))}</b><span>${esc(l)}</span></div>`).join('')}</div>
-        <div class="payroll-grid">
+      <div class="card hero-card">
+        <div class="dash-card-head"><div><p class="page-kicker">Payroll</p><h2 class="card-title">Salary &amp; payable OT</h2></div><span class="badge b-day">Salary month: ${esc(monthName)} ${esc(ym.slice(0,4))}</span></div>
+        <div class="payroll-hero"><span>Payable for ${esc(due.workMonth)} work-month</span><strong>${money(due.otAmount + due.holidayAmount)}</strong><small>Regular OT ${money(due.otAmount)} + Government holiday ${money(due.holidayAmount)} (${due.holidayDays} ${dayWord})</small></div>
+        <div class="mini-grid">
           <div><small>Monthly salary</small><b>${money(due.salary)}</b></div>
-          <div><small>Food allowance received</small><b>${money(due.foodReceived)}</b></div>
-          <div><small>Food expense</small><b>${money(due.foodExpense)}</b></div>
           <div><small>Estimated total income</small><b>${money(due.totalIncome)}</b></div>
-          <div><small>Net after food expense</small><b>${money(due.net)}</b></div>
-          <div><small>Running ${esc(ym)} OT (not yet payable)</small><b>${money(workMonthAmount.otAmount + workMonthAmount.holidayDays*HOLIDAY_RATE)}</b></div>
+          <div><small>Running ${esc(ym)} OT (not yet payable)</small><b>${money(running)}</b></div>
         </div>
-      <div class="dashboard-income-section"><div class="toolbar"><h2 class="card-title">Salary-month income graph</h2><span class="spacer"></span><span class="muted">${esc(currentYear)}</span></div><div class="bars" id="incomeBars">${barHTML(salaryBars,'value',money)}</div><p class="muted small-note">Each month shows salary + OT from two months earlier + government holiday allowance + food allowance marked Paid. The current salary month is highlighted.</p></div></div>`;
+      </div>
+      <div class="card">
+        <div class="dash-card-head"><div><p class="page-kicker">Overtime</p><h2 class="card-title">Today &amp; this month</h2></div></div>
+        <div class="kv-list">
+          <div class="kv-row"><div class="k"><b>Today</b><small>${esc(now)}</small></div><div class="v">${esc(fmtOTText(todayMins))}<small>${money(getOTAmount({date:now,ot:formatOT(todayMins)}))}</small></div></div>
+          <div class="kv-row"><div class="k"><b>${esc(monthName)}</b><small>Current work month</small></div><div class="v">${esc(fmtOTText(monthMins))}<small>${money(monthOTValue)}</small></div></div>
+          <div class="kv-row"><div class="k"><b>${esc(sel)} total</b><small>Selected year</small></div><div class="v">${esc(fmtOTText(yearMins))}<small>${money(yearOTValue)}</small></div></div>
+          <div class="kv-row"><div class="k"><b>Highest OT day</b><small>${esc(sel)}</small></div><div class="v">${peak ? esc(fmtOTText(parseOT(peak.ot))) : '—'}<small>${peak ? esc(peak.date) : 'No OT recorded'}</small></div></div>
+        </div>
+      </div>`;
+
+    const bars = $('incomeBars');
+    if (bars) {
+      const items = months.map((name,i) => {
+        const sm = `${sel}-${String(i+1).padStart(2,'0')}`;
+        return {label:name, short:name.slice(0,3), value:buildPayoutSummary(reports, finance, sm).totalIncome, current:sm===ym};
+      });
+      bars.innerHTML = barHTML(items, 'value', moneyShort, money);
+    }
   }
   function fmtOTText(mins) {
     const h=Math.floor(mins/60), m=mins%60;
@@ -283,23 +287,15 @@
     const rows=liveProfiles().slice().sort((a,b)=>b.effectiveFrom.localeCompare(a.effectiveFrom));
     host.innerHTML=rows.length?rows.map(p=>`<div class="finance-row"><div><b>${esc(p.effectiveFrom)}</b><small>Salary ${money(p.monthlySalary)} · OT ${money(p.otRate)}/hour</small></div><button type="button" class="btn btn-ghost btn-sm btn-danger" data-finance-delete="profiles" data-id="${esc(p.id)}">Remove</button></div>`).join(''):'<p class="muted">No appraisal profile set yet. Until then OT uses ৳235/hour and Salary displays ৳0.</p>';
   }
-  function renderCollection(hostId, collection, renderRow) {
-    const host=$(hostId);if(!host)return;
-    const rows=finance[collection].filter(x=>x&&!x.deleted).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')) || (b.updatedAt||0)-(a.updatedAt||0));
-    host.innerHTML=rows.length?rows.map(renderRow).join(''):'<p class="muted">No entries yet.</p>';
-  }
   function renderMoneyTables() {
     renderProfiles();
-    renderCollection('allowanceList','foodAllowances',x=>`<div class="finance-row"><div><b>${esc(x.date)} · ${money(x.amount)}</b><small>${esc(x.location||'Location not set')} · ${esc(x.distanceKm||'—')} km · Ref: ${esc(x.referenceNo||'Not entered')} · ${esc(x.status||'pending')}</small><small>${esc(x.remarks||'')}</small></div><button class="btn btn-ghost btn-sm btn-danger" data-finance-delete="foodAllowances" data-id="${esc(x.id)}">Remove</button></div>`);
-    renderCollection('expenseList','foodExpenses',x=>`<div class="finance-row"><div><b>${esc(x.date)} · ${money(x.amount)}</b><small>${esc(x.location||'')} · ${esc(x.details||'')}</small><small>${esc(x.remarks||'')}</small></div><button class="btn btn-ghost btn-sm btn-danger" data-finance-delete="foodExpenses" data-id="${esc(x.id)}">Remove</button></div>`);
-    renderCollection('journeyList','journeys',x=>`<div class="finance-row"><div><b>${esc(x.date)} · ${esc(x.from||'?')} → ${esc(x.to||'?')}</b><small>${esc(x.client||'')} · ${esc(x.distanceKm||'—')} km · ${esc(x.purpose||'')}</small><small>${esc(x.transport||'')} ${esc(x.remarks||'')}</small></div><button class="btn btn-ghost btn-sm btn-danger" data-finance-delete="journeys" data-id="${esc(x.id)}">Remove</button></div>`);
     const status=$('financeSyncStatus'); if(status)status.textContent=activeUid?(financeRef?'Cloud sync enabled':'Cloud sync unavailable'):localOnlyReason;
   }
   function renderPersonalMoney() {
     const month=$('moneyMonth');if(month)month.value=selectedMoneyMonth;
     const summary=payoutForMonth(selectedMoneyMonth);
     const headline=$('moneyPayoutSummary');
-    if(headline)headline.innerHTML=`<div class="payroll-hero"><span>${esc(selectedMoneyMonth)} Salary Month · OT work month ${esc(summary.workMonth)}</span><strong>${money(summary.totalIncome)}</strong><small>Salary ${money(summary.salary)} + Regular OT ${money(summary.otAmount)} + Holiday ${money(summary.holidayAmount)} + Food allowance received ${money(summary.foodReceived)}</small></div><div class="payroll-grid"><div><small>Payable OT</small><b>${money(summary.otAmount)}</b></div><div><small>Holiday allowance</small><b>${money(summary.holidayAmount)}</b></div><div><small>Food expense</small><b>${money(summary.foodExpense)}</b></div><div><small>Net after food expense</small><b>${money(summary.net)}</b></div></div>`;
+    if(headline)headline.innerHTML=`<div class="payroll-hero"><span>${esc(selectedMoneyMonth)} Salary Month · OT work month ${esc(summary.workMonth)}</span><strong>${money(summary.totalIncome)}</strong><small>Salary ${money(summary.salary)} + Regular OT ${money(summary.otAmount)} + Holiday ${money(summary.holidayAmount)}</small></div><div class="payroll-grid"><div><small>Monthly salary</small><b>${money(summary.salary)}</b></div><div><small>Payable OT</small><b>${money(summary.otAmount)}</b></div><div><small>OT hours (${esc(summary.workMonth)})</small><b>${esc(fmtOTText(summary.otMinutes))}</b></div><div><small>Holiday allowance</small><b>${money(summary.holidayAmount)}</b></div></div>`;
     renderMoneyTables();
   }
   function renderAll() { renderPersonalDashboard(); renderPersonalCalendar(); renderPersonalMoney(); }
@@ -394,27 +390,16 @@
 
   function onFormSubmit(e) {
     const form=e.target;
-    if(!(form instanceof HTMLFormElement))return;
+    if(!(form instanceof HTMLFormElement) || form.id!=='profileForm')return;
     e.preventDefault();
-    const fd=new FormData(form), v=Object.fromEntries(fd.entries());
+    const v=Object.fromEntries(new FormData(form).entries());
     const n=x=>Number(x)||0;
-    if(form.id==='profileForm') {
-      if(!v.effectiveFrom || n(v.otRate)<0 || n(v.salary)<0){notice('Enter a valid effective date, salary and OT rate.','warn');return;}
-      if(addItem('profiles',{effectiveFrom:v.effectiveFrom,monthlySalary:n(v.salary),otRate:n(v.otRate)})){form.reset();$('profileDate').value=today();$('profileOtRate').value=String(n(v.otRate));notice('Appraisal salary and OT rate saved.','success');}
-    } else if(form.id==='allowanceForm') {
-      if(!v.date || n(v.amount)<=0){notice('Food allowance date and amount are required.','warn');return;}
-      if(addItem('foodAllowances',{date:v.date,location:v.location||'',distanceKm:n(v.distanceKm),amount:n(v.amount),referenceNo:v.referenceNo||'',status:v.status||'pending',remarks:v.remarks||''})){form.reset();$('allowanceDate').value=today();notice('Food allowance entry saved.','success');}
-    } else if(form.id==='expenseForm') {
-      if(!v.date || n(v.amount)<=0){notice('Food expense date and amount are required.','warn');return;}
-      if(addItem('foodExpenses',{date:v.date,amount:n(v.amount),location:v.location||'',details:v.details||'',remarks:v.remarks||''})){form.reset();$('expenseDate').value=today();notice('Food expense saved.','success');}
-    } else if(form.id==='journeyForm') {
-      if(!v.date || !v.from || !v.to){notice('Journey date, From and To are required.','warn');return;}
-      if(addItem('journeys',{date:v.date,from:v.from,to:v.to,client:v.client||'',distanceKm:n(v.distanceKm),purpose:v.purpose||'',transport:v.transport||'',remarks:v.remarks||''})){form.reset();$('journeyDate').value=today();notice('Journey entry saved.','success');}
-    }
+    if(!v.effectiveFrom || n(v.otRate)<0 || n(v.salary)<0){notice('Enter a valid effective date, salary and OT rate.','warn');return;}
+    if(addItem('profiles',{effectiveFrom:v.effectiveFrom,monthlySalary:n(v.salary),otRate:n(v.otRate)})){form.reset();$('profileDate').value=today();$('profileOtRate').value=String(n(v.otRate));notice('Appraisal salary and OT rate saved.','success');}
   }
 
   function bindUI() {
-    ['profileForm','allowanceForm','expenseForm','journeyForm'].forEach(id=>$(id)?.addEventListener('submit',onFormSubmit));
+    $('profileForm')?.addEventListener('submit',onFormSubmit);
     $('calMonth')?.addEventListener('change',e=>{selectedCalendarMonth=e.target.value||monthNow();renderPersonalCalendar();});
     $('moneyMonth')?.addEventListener('change',e=>{selectedMoneyMonth=e.target.value||monthNow();renderPersonalMoney();});
     $('calPrev')?.addEventListener('click',()=>{selectedCalendarMonth=monthShift(selectedCalendarMonth,-1);renderPersonalCalendar();});
@@ -428,14 +413,13 @@
     document.addEventListener('click',e=>{
       const b=e.target.closest('[data-finance-delete]');if(!b)return;
       const collection=b.dataset.financeDelete;
-      if(!['profiles','foodAllowances','foodExpenses','journeys'].includes(collection))return;
+      if(collection!=='profiles')return;
       if(!confirm('Remove this entry? It will remain in backup history as a deleted record.'))return;
       removeItem(collection,b.dataset.id);
     });
     // Existing app notifies this module whenever the report array is reloaded or changed.
     window.addEventListener('activity-data-updated',renderPersonalDashboard);
-    $('profileDate').value=today();
-    $('allowanceDate').value=today();$('expenseDate').value=today();$('journeyDate').value=today();
+    if($('profileDate'))$('profileDate').value=today();
   }
 
   window.addEventListener('activity-auth-changed',e=>onAuthChanged(e.detail?.uid||null));
@@ -453,9 +437,9 @@
       date,dutyStatus,expected,report,
       finance:{
         profiles:finance.profiles.filter(x=>!x.deleted&&x.effectiveFrom===date),
-        foodAllowances:finance.foodAllowances.filter(x=>!x.deleted&&x.date===date),
-        foodExpenses:finance.foodExpenses.filter(x=>!x.deleted&&x.date===date),
-        journeys:finance.journeys.filter(x=>!x.deleted&&x.date===date)
+        foodAllowances:[],
+        foodExpenses:[],
+        journeys:[]
       }
     };
     return JSON.parse(JSON.stringify(snapshot));

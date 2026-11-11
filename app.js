@@ -224,7 +224,7 @@ function showTab(t){
   document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
   // Mobile bottom nav
   document.querySelectorAll('.bnav-btn').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
-  if(t==='dashboard')initDashboardYears();
+  if(t==='dashboard'){initDashboardYears();if(window.renderPersonalDashboard)window.renderPersonalDashboard()}
   if(t==='history')renderHistory();
   if(t==='analytics')initYears();
   if(t==='calendar'&&window.renderPersonalCalendar)window.renderPersonalCalendar();
@@ -250,20 +250,23 @@ function skeletonHistory(){
 /* ---------- Report form ---------- */
 const CAT_HTML='<option value="">Choose a category</option>'+CATEGORIES.map(c=>`<option>${esc(c)}</option>`).join('');
 
-function addRow(v,focus){
+function addRow(v,focus,after){
   v=v||{};
-  if(document.querySelectorAll('.entry').length>=MAX_ROWS){toast(`Maximum ${MAX_ROWS} activities per report`,'warn');return}
+  if(document.querySelectorAll('.entry').length>=MAX_ROWS){toast(`Maximum ${MAX_ROWS} activities per report`,'warn');return null}
   const el=document.createElement('section');el.className='card entry';
   el.style.animation='pageIn .22s ease both';
   el.innerHTML=`
     <div class="entry-head"><span class="badge b-num">Activity</span>
-      <button type="button" class="btn btn-ghost btn-sm" data-act="remove-row">Remove</button></div>
+      <div class="entry-actions">
+        <button type="button" class="btn btn-ghost btn-sm" data-act="copy-row" title="Duplicate this activity"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>Copy</button>
+        <button type="button" class="btn btn-ghost btn-sm btn-danger" data-act="remove-row">Remove</button>
+      </div></div>
     <div class="grid g3">
       <div class="field"><label>Client</label><input class="client" list="dl-client" autocomplete="off"></div>
       <div class="field"><label>Site code</label><input class="site" list="dl-site" autocomplete="off"></div>
       <div class="field"><label>Category</label><select class="category">${CAT_HTML}</select></div>
     </div>
-    <div class="field row-top"><label>Activity details</label><textarea class="work" rows="2" placeholder="What was done?"></textarea></div>
+    <div class="field row-top work-field"><label>Activity details</label><textarea class="work" rows="2" autocomplete="off" placeholder="What was done? Earlier descriptions will be suggested as you type"></textarea></div>
     <div class="grid g2 row-top">
       <div class="field"><label>Assigned by</label><input class="assignBy" list="dl-assign" autocomplete="off"></div>
       <div class="field"><label>Team / person</label><input class="team" list="dl-team" autocomplete="off"></div>
@@ -272,9 +275,10 @@ function addRow(v,focus){
   if(v.cat&&!CATEGORIES.includes(v.cat)){const o=document.createElement('option');o.textContent=v.cat;q('.category').appendChild(o)}
   q('.client').value=v.c||'';q('.site').value=v.s||'';q('.category').value=v.cat||'';
   q('.work').value=v.w||'';q('.assignBy').value=v.ab||'';q('.team').value=v.t||'';
-  $('entries').appendChild(el);
+  if(after&&after.parentNode)after.after(el);else $('entries').appendChild(el);
   renumber();
   if(focus)q('.client').focus();
+  return el;
 }
 function renumber(){
   document.querySelectorAll('.entry').forEach((el,i)=>{el.querySelector('.badge').textContent='Activity '+(i+1)});
@@ -285,15 +289,88 @@ function setRows(rows,min){
   const n=Math.max(min||3,last+1);
   for(let i=0;i<n;i++)addRow((rows||[])[i]);
 }
-function readRows(){
-  return [...document.querySelectorAll('.entry')].map(el=>({
+function readEntry(el){
+  return {
     c:el.querySelector('.client').value.trim(),
     s:el.querySelector('.site').value.trim(),
     cat:el.querySelector('.category').value,
     w:el.querySelector('.work').value.trim(),
     ab:el.querySelector('.assignBy').value.trim(),
     t:el.querySelector('.team').value.trim()
+  };
+}
+function readRows(){return [...document.querySelectorAll('.entry')].map(readEntry)}
+
+/* ---------- Activity details suggestions (from earlier reports) ---------- */
+let workPool=null,sugBox=null,sugEntry=null,sugList=[],sugIdx=-1,sugMute=false;
+function getWorkPool(){
+  if(workPool)return workPool;
+  const map=new Map();
+  DB.forEach(rep=>(rep.rows||[]).forEach(r=>{
+    const w=((r&&r.w)||'').trim();if(!w)return;
+    const key=w.replace(/\s+/g,' ').toLowerCase();
+    let e=map.get(key);
+    if(!e){e={text:w,key,count:0,cats:{},clients:{},last:''};map.set(key,e)}
+    e.count++;
+    if(r.cat)e.cats[r.cat]=(e.cats[r.cat]||0)+1;
+    if(r.c)e.clients[r.c]=(e.clients[r.c]||0)+1;
+    if((rep.date||'')>=e.last){e.last=rep.date||'';e.text=w}
   }));
+  workPool=[...map.values()];
+  return workPool;
+}
+const topKey=o=>Object.keys(o).sort((a,b)=>o[b]-o[a])[0]||'';
+function workSuggestions(entry){
+  const q=entry.querySelector('.work').value.trim().toLowerCase().replace(/\s+/g,' ');
+  const cat=entry.querySelector('.category').value,client=entry.querySelector('.client').value.trim();
+  if(q&&q.length<2)return [];
+  const words=q?q.split(' '):[];
+  const out=[];
+  getWorkPool().forEach(e=>{
+    if(e.key===q)return;
+    const sameCat=!!(cat&&e.cats[cat]),sameClient=!!(client&&e.clients[client]);
+    let score=0;
+    if(words.length){
+      if(!words.every(w=>e.key.includes(w)))return;
+      score+=e.key.startsWith(q)?60:e.key.includes(q)?40:20;
+    }else if(!sameCat)return;   // empty box: only suggest for the chosen category
+    if(sameCat)score+=30;
+    if(sameClient)score+=10;
+    score+=Math.min(e.count,10);
+    out.push({e,score});
+  });
+  out.sort((a,b)=>b.score-a.score||b.e.last.localeCompare(a.e.last));
+  return out.slice(0,6).map(x=>x.e);
+}
+function closeSuggest(){
+  if(sugBox){sugBox.remove();sugBox=null}
+  if(sugEntry)sugEntry.classList.remove('sug-open');
+  sugEntry=null;sugList=[];sugIdx=-1;
+}
+function setSugActive(i){
+  sugIdx=i;
+  if(!sugBox)return;
+  sugBox.querySelectorAll('.suggest-item').forEach((n,k)=>{n.classList.toggle('active',k===i);if(k===i)n.scrollIntoView({block:'nearest'})});
+}
+function openSuggest(entry){
+  if(!entry)return;
+  const list=workSuggestions(entry);
+  if(!list.length){closeSuggest();return}
+  if(sugEntry&&sugEntry!==entry)closeSuggest();
+  sugList=list;sugIdx=-1;sugEntry=entry;
+  entry.classList.add('sug-open');
+  if(!sugBox){sugBox=document.createElement('div');sugBox.className='suggest-pop';sugBox.setAttribute('role','listbox')}
+  entry.querySelector('.work-field').appendChild(sugBox);
+  const rect=entry.querySelector('.work').getBoundingClientRect();
+  const vh=(window.visualViewport&&window.visualViewport.height)||window.innerHeight;
+  sugBox.classList.toggle('up',vh-rect.bottom<260&&rect.top>260);
+  sugBox.innerHTML='<div class="suggest-head">From your earlier reports</div>'+list.map((e,i)=>`<div class="suggest-item" role="option" data-i="${i}"><span class="suggest-text">${esc(e.text)}</span><span class="suggest-meta">${esc(topKey(e.cats)||'No category')} · used ${e.count}×</span></div>`).join('');
+}
+function applySuggestion(i){
+  const e=sugList[i],entry=sugEntry;if(!e||!entry)return;
+  const ta=entry.querySelector('.work');
+  sugMute=true;ta.value=e.text;ta.dispatchEvent(new Event('input',{bubbles:true}));sugMute=false;
+  closeSuggest();ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);
 }
 
 function syncShiftUI(){
@@ -451,19 +528,14 @@ function navigate(dir){
   if(!t){toast(dir==='prev'?'No earlier report':'No later report','info');return}
   if(!confirmDiscard())return;openRecord(t);
 }
-function copyLast(){
-  const date=$('reportDate').value,cur=$('editingId').value;
-  const list=DB.filter(r=>r.id!==cur);
-  const c=list.filter(r=>r.date<=date).pop()||list.pop();
-  if(!c){toast('No earlier report to copy from','info');return}
-  if(readRows().some(rowFilled)&&!confirm('Replace the activities in this form?'))return;
-  setRows(c.rows,3);setDirty(true);scheduleDraft();
-  toast(`Copied activities from ${c.date}`,'success');
-}
-
 /* ---------- History ---------- */
+function histRange(){
+  let f=$('dateFrom').value,t=$('dateTo').value;
+  if(f&&t&&f>t)[f,t]=[t,f];   // tolerate From/To picked in the wrong order
+  return [f,t];
+}
 function filtered(){
-  const q=$('hSearch').value.trim().toLowerCase(),sh=$('hShift').value,f=$('dateFrom').value,t=$('dateTo').value;
+  const q=$('hSearch').value.trim().toLowerCase(),sh=$('hShift').value,[f,t]=histRange();
   return DB.filter(r=>{
     if(f&&r.date<f)return false;if(t&&r.date>t)return false;
     if(sh!=='all'&&shiftKind(r.shift)!==sh)return false;
@@ -474,7 +546,7 @@ function filtered(){
 function renderHistory(skeleton){
   const box=$('historyList');
   if(skeleton){box.innerHTML=skeletonHistory();return}
-  const list=filtered(),f=$('dateFrom').value,t=$('dateTo').value;
+  const list=filtered(),[f,t]=histRange();
   $('sCount').textContent=list.length;
   $('sOt').textContent=fmtOT(list.reduce((n,r)=>n+parseOT(r.ot),0));
   $('sRange').textContent=f&&t?`${f} to ${t}`:f?`From ${f}`:t?`Until ${t}`:'All dates';
@@ -524,7 +596,7 @@ function initDashboardYears(){
   renderDashboard();
 }
 function renderDashboard(){
-  if(!$('dashboardStats'))return;
+  if(!$('dashStats'))return;
   const year=$('dashYear').value||String(new Date().getFullYear());
   const records=DB.filter(r=>r.date&&r.date.startsWith(year+'-'));
   const totalOT=records.reduce((n,r)=>n+parseOT(r.ot),0);
@@ -538,16 +610,17 @@ function renderDashboard(){
   const cards=[
     [records.length,'Total reports'],
     [duty,'Duty days'],
-    [fmtOT(totalOT),'Total overtime'],
-    [avgOT,'Avg OT / duty day'],
-    [activities,'Activities recorded'],
     [`${day} / ${night}`,'Day / Night shifts'],
+    [activities,'Activities recorded'],
+    [fmtOT(totalOT),'Total overtime','is-key'],
+    [avgOT,'Avg OT / duty day'],
     [leave,'Leave days'],
     [off,'Off / holidays']
   ];
-  $('dashboardStats').innerHTML=cards.map(([v,l])=>`<div class="stat"><b>${esc(String(v))}</b><span>${esc(l)}</span></div>`).join('');
+  $('dashStats').innerHTML=cards.map(([v,l,c])=>`<div class="stat${c?' '+c:''}"><span>${esc(l)}</span><b>${esc(String(v))}</b></div>`).join('');
+  const tag=$('dashYearTag');if(tag)tag.textContent=year;
 
-  /* Dashboard bars */
+  /* Monthly overtime bars */
   const monthly=MONTHS.map((name,i)=>{
     const prefix=`${year}-${String(i+1).padStart(2,'0')}`;
     const rows=records.filter(r=>r.date.startsWith(prefix));
@@ -565,16 +638,17 @@ function renderDashboard(){
     </div>`;
   }).join('');
 
-  /* Recent table */
-  const recent=[...records].sort((a,b)=>byDate(b,a)).slice(0,10);
+  /* Recent reports */
+  const recent=[...records].sort((a,b)=>byDate(b,a)).slice(0,8);
   $('dashboardRecent').innerHTML=recent.length
     ?recent.map(r=>`<tr>
         <td>${esc(r.date)}</td>
         <td><span class="badge b-${shiftKind(r.shift)}">${esc(label(r.shift||'DAY'))}</span></td>
+        <td class="muted">${isOffShift(r.shift)?'—':esc(r.startTime||'--')+' – '+esc(r.endTime||'--')}</td>
         <td><span class="activity-count-chip">${(r.rows||[]).filter(rowFilled).length}</span></td>
         <td class="${otClass(parseOT(r.ot))}" style="font-weight:700">${esc(r.ot||'0 hrs')}</td>
       </tr>`).join('')
-    :'<tr><td colspan="4" style="text-align:center;color:var(--muted)">No reports found</td></tr>';
+    :'<tr><td colspan="5" class="dash-empty">No reports found for '+esc(year)+'</td></tr>';
 }
 
 /* ---------- Analytics ---------- */
@@ -623,13 +697,13 @@ function renderAnalytics(){
 }
 
 function refreshData(){
+  workPool=null;
   const sites=new Set();DB.forEach(r=>(r.rows||[]).forEach(x=>{if(x.s)sites.add(x.s)}));
   $('dl-site').innerHTML=[...sites].sort().map(s=>`<option value="${esc(s)}">`).join('');
   if(tab==='dashboard')renderDashboard();
   if(tab==='history')renderHistory();
   if(tab==='analytics')renderAnalytics();
   window.dispatchEvent(new CustomEvent('activity-data-updated'));
-  if(window.renderPersonalDashboard)window.renderPersonalDashboard();
 }
 
 /* ---------- Report paper (print + PDF) ---------- */
@@ -810,9 +884,15 @@ async function syncNow(){
 /* ---------- Events ---------- */
 const actions={
   tab:b=>{if(b.dataset.tab!==tab)showTab(b.dataset.tab)},
-  new:()=>newEntry(),save:saveData,'copy-last':copyLast,
+  new:()=>newEntry(),save:saveData,
   prev:()=>navigate('prev'),next:()=>navigate('next'),
   'add-row':()=>{addRow({},true);setDirty(true);scheduleDraft()},
+  'copy-row':b=>{
+    const src=b.closest('.entry');if(!src)return;
+    const copy=addRow(readEntry(src),false,src);if(!copy)return;
+    const site=copy.querySelector('.site');site.focus();site.select();
+    setDirty(true);scheduleDraft();toast('Activity copied','success');
+  },
   'remove-row':b=>{
     if(document.querySelectorAll('.entry').length<=1){toast('A report needs at least one activity box','info');return}
     b.closest('.entry').remove();renumber();setDirty(true);scheduleDraft();
@@ -834,9 +914,11 @@ document.addEventListener('click',e=>{
 $('historyList').addEventListener('change',e=>{
   if(e.target.classList.contains('chk')){e.target.checked?selected.add(e.target.dataset.id):selected.delete(e.target.dataset.id);updateSelUI()}
 });
-['hSearch','hShift','dateFrom','dateTo'].forEach(id=>$(id).addEventListener('input',renderHistory));
+// Wrapped on purpose: passing renderHistory directly handed it the event object,
+// which it read as "show skeleton" and the list never refreshed until the tab was reopened.
+['hSearch','hShift','dateFrom','dateTo'].forEach(id=>['input','change','search'].forEach(ev=>$(id).addEventListener(ev,()=>renderHistory())));
 $('yearSel').addEventListener('change',renderAnalytics);
-$('dashYear').addEventListener('change',renderDashboard);
+$('dashYear').addEventListener('change',()=>{renderDashboard();if(window.renderPersonalDashboard)window.renderPersonalDashboard()});
 $('restoreInput').addEventListener('change',handleRestore);
 $('gotoDate').addEventListener('change',e=>{
   const d=e.target.value;e.target.value='';if(!d)return;
@@ -851,6 +933,27 @@ const form=$('reportForm');
   setDirty(true);scheduleDraft();
 }));
 form.addEventListener('focusout',e=>{if(e.target.classList.contains('site'))e.target.value=e.target.value.trim().toUpperCase()});
+const entriesBox=$('entries');
+entriesBox.addEventListener('input',e=>{if(!sugMute&&e.target.classList.contains('work'))openSuggest(e.target.closest('.entry'))});
+entriesBox.addEventListener('focusin',e=>{if(e.target.classList.contains('work'))openSuggest(e.target.closest('.entry'))});
+entriesBox.addEventListener('focusout',e=>{
+  if(!e.target.classList.contains('work'))return;
+  const ent=e.target.closest('.entry'),ta=e.target;
+  setTimeout(()=>{if(sugEntry===ent&&document.activeElement!==ta)closeSuggest()},120);
+});
+entriesBox.addEventListener('keydown',e=>{
+  if(!sugBox||!e.target.classList.contains('work'))return;
+  const n=sugList.length;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault();
+    const down=e.key==='ArrowDown';
+    setSugActive(sugIdx<0?(down?0:n-1):(sugIdx+(down?1:-1)+n)%n);
+  }else if(e.key==='Enter'&&sugIdx>=0){e.preventDefault();applySuggestion(sugIdx)}
+  else if(e.key==='Escape'){e.preventDefault();closeSuggest()}
+});
+// mousedown keeps the textarea focused; click applies the choice (also works for taps)
+entriesBox.addEventListener('mousedown',e=>{if(e.target.closest('.suggest-pop'))e.preventDefault()});
+entriesBox.addEventListener('click',e=>{const it=e.target.closest('.suggest-item');if(it)applySuggestion(Number(it.dataset.i))});
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&tab==='report'){e.preventDefault();saveData()}
 });
