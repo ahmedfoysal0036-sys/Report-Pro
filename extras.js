@@ -450,25 +450,22 @@
     });
     renderCalOT(all);
   }
-  /* 3 OT summary boxes under the existing calendar summary */
+  /* 2 OT boxes placed inside the existing calendar summary grid (fills the empty slots) */
   function renderCalOT(all) {
     const sum = $('calendarSummary'); if (!sum) return;
-    let box = $('xCalOT');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = 'xCalOT'; box.className = 'stats';
-      sum.after(box);
-    }
+    const old = $('xCalOT'); if (old) old.remove();
     const mi = $('calMonth'), ym = (mi && mi.value) || today().slice(0, 7);
     const rows = all.filter(r => r.date.startsWith(ym));
     const mins = rows.reduce((n, r) => n + parseOT(r.ot), 0);
-    const otDays = rows.filter(r => parseOT(r.ot) > 0).length;
     const otAmt = rows.reduce((n, r) => n + otAmount(r), 0);
     const hol = rows.filter(isHolidayDuty).length * HOLIDAY_RATE;
-    const st = (v, l) => `<div class="stat"><b>${esc(v)}</b><span>${esc(l)}</span></div>`;
-    box.innerHTML = st(fmt(mins), 'Total OT hours (this month)')
-      + st(String(otDays), 'OT days in ' + MONTHS[Number(ym.slice(5, 7)) - 1])
-      + st(money(otAmt + hol), hol ? 'Payable OT (incl. holiday allowance)' : 'Payable OT amount');
+    const put = (id, v, l) => {
+      let el = $(id);
+      if (!el) { el = document.createElement('div'); el.id = id; el.className = 'stat'; sum.appendChild(el); }
+      el.innerHTML = `<b>${esc(v)}</b><span>${esc(l)}</span>`;
+    };
+    put('xStatOT', fmt(mins), 'Total OT hours (this month)');
+    put('xStatPay', money(otAmt + hol), hol ? 'Payable OT (incl. holiday allowance)' : 'Payable OT amount');
   }
   function watchCalendar() {
     const grid = $('calendarGrid'); if (!grid) return;
