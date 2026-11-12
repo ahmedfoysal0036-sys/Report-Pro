@@ -138,8 +138,16 @@
 #calendarGrid .cal-cell.x-today{position:relative}
 .x-today-tag{position:absolute;top:6px;right:6px;padding:1px 6px;border-radius:999px;background:var(--primary);color:var(--on-primary);font-style:normal;font-size:9px;font-weight:800;letter-spacing:.02em}
 @media(max-width:480px){.x-cal-ot,.x-cal-amt{font-size:8.5px}.x-today-tag{top:4px;right:3px;padding:1px 4px;font-size:7.5px}}
-#calendarGrid .cal-cell.x-ot-mid{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--primary) 45%,transparent)}
-#calendarGrid .cal-cell.x-ot-hi{box-shadow:inset 0 0 0 2.5px var(--primary)}
+/* 3 states: no report = plain, report entered = tint + bold border, holiday = holiday tint + bold border */
+#view-calendar #calendarGrid .cal-cell{box-shadow:none;border:1px solid var(--border);background:var(--surface)}
+#view-calendar #calendarGrid .cal-cell.x-has{border:2px solid var(--primary);background:var(--primary-soft)}
+#view-calendar #calendarGrid .cal-cell.x-has.x-hol{border-color:var(--warn);background:var(--warn-soft)}
+.x-wk{background:var(--surface)}
+.x-wk.x-has{border:2px solid var(--primary);background:var(--primary-soft)}
+.x-wk.x-has.x-hol{border-color:var(--warn);background:var(--warn-soft)}
+#view-calendar .calendar-legend>span:not(#xCalLegend){display:none}
+#xCalLegend{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+#xCalLegend .x-sw{display:inline-block;width:14px;height:14px;border-radius:5px;vertical-align:-2px;margin-right:5px;box-sizing:border-box}
 `;
     document.head.appendChild(st);
   }
@@ -229,14 +237,30 @@
     if (rec) bar.dataset.id = String(rec.id);
     bar.innerHTML = rec
       ? '<button class="btn btn-sm" type="button" data-x="day-edit">Edit report</button><button class="btn btn-sm" type="button" data-x="day-del">Delete</button>'
-      : '<button class="btn btn-sm" type="button" data-x="day-add">Add report</button>';
+      : '<select class="x-input" id="xHolType" aria-label="Holiday type"><option value="Weekly Holiday">Weekly holiday</option><option value="Goverment Holiday">Government holiday</option><option value="Off day">Off day</option></select>'
+        + '<button class="btn btn-sm" type="button" data-x="day-hol">Set holiday</button>'
+        + '<button class="btn btn-sm" type="button" data-x="day-add">Add report</button>';
     head.after(bar);
+  }
+  function setHoliday(date, type) {
+    // Uses the app's own form + save, so it syncs to the cloud and shows in History like any off-day report.
+    if (!openReport({date})) return;
+    const off = $('shiftOff'); if (!off) return;
+    off.checked = true; off.dispatchEvent(new Event('change', {bubbles: true}));
+    const sel = $('offType');
+    if (sel) { sel.value = type; sel.dispatchEvent(new Event('change', {bubbles: true})); }
+    const sv = document.querySelector('[data-act="save"]');
+    if (sv) sv.click();
   }
   function dayAction(a, bar) {
     const date = bar.dataset.date, id = bar.dataset.id;
     const close = () => { const c = document.querySelector('.calendar-day-close'); if (c) c.click(); };
     lastTab = 'calendar'; updateBackLabel();
     if (a === 'day-add') { close(); openReport({date}); }
+    else if (a === 'day-hol') {
+      const type = ($('xHolType') && $('xHolType').value) || 'Weekly Holiday';
+      close(); setHoliday(date, type);
+    }
     else if (a === 'day-edit') { close(); triggerAct('edit', id); }
     else if (a === 'day-del') {
       triggerAct('del', id); // app asks "Delete this report?"
@@ -324,7 +348,7 @@
         if (isDuty(r)) duty++;
         if (isHolidayDuty(r)) amount += HOLIDAY_RATE;
       }
-      cells.push(`<div class="x-wk cal-${k}${d === t ? ' is-today' : ''}"><strong>${DAYS[parseD(d).getDay()]} ${d.slice(8)}/${d.slice(5, 7)}</strong><span>${KIND_LABEL[k]}${r && isHolidayDuty(r) ? ' + Gov' : ''}</span><b>${m ? esc(fmtS(m)) : '—'}</b>${m ? `<em>${money(otAmount(r))}</em>` : ''}</div>`);
+      cells.push(`<div class="x-wk${r ? ' x-has' : ''}${k === 'holiday' || k === 'off' ? ' x-hol' : ''}${d === t ? ' is-today' : ''}"><strong>${DAYS[parseD(d).getDay()]} ${d.slice(8)}/${d.slice(5, 7)}</strong><span>${KIND_LABEL[k]}${r && isHolidayDuty(r) ? ' + Gov' : ''}</span><b>${m ? esc(fmtS(m)) : '—'}</b>${m ? `<em>${money(otAmount(r))}</em>` : ''}</div>`);
     }
     const end = addDays(start, 6);
     $('xWeekTitle').textContent = weekOff === 0 ? 'This week' : `${start} → ${end}`;
@@ -423,20 +447,28 @@
     if (legend && !$('xCalLegend')) {
       const sp = document.createElement('span');
       sp.id = 'xCalLegend';
-      sp.innerHTML = '<b style="color:var(--primary)">3h 20m</b> = OT (thin ring 2h+, thick ring 4h+)';
+      sp.innerHTML = '<span><i class="x-sw" style="background:var(--surface);border:1px solid var(--border)"></i>No report</span>'
+        + '<span><i class="x-sw" style="background:var(--primary-soft);border:2px solid var(--primary)"></i>Report entered</span>'
+        + '<span><i class="x-sw" style="background:var(--warn-soft);border:2px solid var(--warn)"></i>Holiday</span>'
+        + '<span><b style="color:var(--primary)">5h</b> / ৳ = OT time and taka</span>';
       legend.appendChild(sp);
     }
     const all = reports();
     const map = new Map(all.map(r => [r.date, r]));
     const t = today();
     grid.querySelectorAll('.cal-cell[data-date]').forEach(c => {
+      const r = map.get(c.dataset.date);
+      if (r) {
+        c.classList.add('x-has');
+        const k = kindOf(r);
+        if (k === 'holiday' || k === 'off') c.classList.add('x-hol');
+      }
       if (c.dataset.date === t && !c.querySelector('.x-today-tag')) {
         const tag = document.createElement('em');
         tag.className = 'x-today-tag'; tag.textContent = 'Today';
         c.classList.add('x-today'); c.appendChild(tag);
       }
-      if (c.querySelector('.x-cal-ot')) return;
-      const r = map.get(c.dataset.date); if (!r) return;
+      if (c.querySelector('.x-cal-ot') || !r) return;
       const m = parseOT(r.ot); if (m <= 0) return;
       const amt = otAmount(r);
       const em = document.createElement('em');
@@ -446,7 +478,6 @@
       am.className = 'x-cal-amt'; am.textContent = '৳' + Math.round(amt).toLocaleString('en-BD');
       am.title = money(amt);
       c.appendChild(am);
-      c.classList.add(m >= 240 ? 'x-ot-hi' : m >= 120 ? 'x-ot-mid' : 'x-ot-lo');
     });
     renderCalOT(all);
   }
@@ -495,7 +526,7 @@
         if (chip && !chip.hidden && !confirm('Unsaved change ache. Discard kore back jabe?')) return;
         goTab(lastTab);
       }
-      else if (a === 'day-edit' || a === 'day-del' || a === 'day-add') dayAction(a, b.closest('.x-day-actions'));
+      else if (a === 'day-edit' || a === 'day-del' || a === 'day-add' || a === 'day-hol') dayAction(a, b.closest('.x-day-actions'));
       else if (a === 'target-save') targetSave();
       else if (a === 'target-clear') targetClear();
       else if (a === 'wk-prev') { weekOff--; renderWeek(); }
