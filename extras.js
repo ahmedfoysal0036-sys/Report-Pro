@@ -226,6 +226,10 @@
     if (saveFlag && Date.now() - saveFlag < 20000 && v && !v.hidden && chip && chip.hidden) { saveFlag = 0; goTab(lastTab); }
   }
   function decorateDayModal(modal) {
+    // Money entries (appraisal / food / journey) are not used any more: drop that block from the day sheet.
+    modal.querySelectorAll('.calendar-day-section > h3').forEach(h => {
+      if (h.textContent.trim() === 'Money entries') h.parentElement.remove();
+    });
     if (modal.querySelector('.x-day-actions')) return;
     const head = modal.querySelector('.calendar-day-header'), h = modal.querySelector('.calendar-day-header h2');
     if (!head || !h) return;
