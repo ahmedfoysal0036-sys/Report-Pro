@@ -903,7 +903,7 @@ const actions={
   'select-all':()=>{const list=filtered(),all=list.every(r=>selected.has(r.id));list.forEach(r=>all?selected.delete(r.id):selected.add(r.id));renderHistory()},
   'reset-filters':()=>{['hSearch','dateFrom','dateTo'].forEach(i=>$(i).value='');$('hShift').value='all';renderHistory()},
   pdf:exportPDF,excel:exportExcel,print:printReports,
-  'json-backup':exportJSON,restore:()=>$('restoreInput').click(),sync:syncNow,
+  'json-backup':exportJSON,restore:()=>$('restoreInput').click(),sync:syncNow,'wipe-all':wipeAllData,
   theme:b=>window.ReportProTheme?.toggleMenu(b)
 };
 document.addEventListener('click',e=>{
@@ -994,6 +994,38 @@ $('resetPasswordBtn').addEventListener('click',async()=>{
   const email=$('loginEmail').value.trim();if(!email){showAuthError('Enter your work email first.');return}
   try{await auth.sendPasswordResetEmail(email);showAuthError('Password reset email sent if the account exists.')}catch(err){showAuthError(err.message)}
 });
+/* ---------- Full data wipe (needs login password) ---------- */
+function askPassword(){
+  return new Promise(res=>{
+    const w=document.createElement('div');
+    w.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:99999';
+    w.innerHTML='<div style="background:#fff;color:#111;padding:20px;border-radius:12px;width:min(92vw,360px);font:14px system-ui"><b style="color:#c62828">Delete ALL data</b><p style="margin:8px 0">Enter your login password to confirm. This cannot be undone.</p><input type="password" autocomplete="current-password" style="width:100%;padding:10px;box-sizing:border-box;border:1px solid #999;border-radius:8px"><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" data-c style="padding:8px 14px">Cancel</button><button type="button" data-o style="padding:8px 14px;background:#c62828;color:#fff;border:0;border-radius:6px">Delete everything</button></div></div>';
+    document.body.appendChild(w);
+    const i=w.querySelector('input');i.focus();
+    const done=v=>{w.remove();res(v)};
+    w.querySelector('[data-c]').onclick=()=>done(null);
+    w.querySelector('[data-o]').onclick=()=>done(i.value);
+    i.addEventListener('keydown',e=>{if(e.key==='Enter')done(i.value);if(e.key==='Escape')done(null)});
+  });
+}
+async function wipeAllData(){
+  if(!currentUser||!auth){toast('Sign in first','error');return}
+  if(!confirm('Delete ALL reports and personal finance data from cloud and this device? Download a JSON backup first. This cannot be undone.'))return;
+  const pw=await askPassword();if(!pw)return;
+  showLoader('Verifying password…');
+  try{await currentUser.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(currentUser.email,pw))}
+  catch(err){hideLoader();toast('Wrong password. Nothing was deleted.','error');return}
+  showLoader('Deleting all data…');
+  try{
+    stopCloud();
+    if(dbRef)await Promise.race([dbRef.remove(),timeout(20000,'Cloud delete timed out')]);
+  }catch(err){hideLoader();toast('Cloud delete failed: '+err.message+'. Local data was kept.','error');startCloud();return}
+  try{
+    [DB_KEY,DRAFT_KEY,PENDING_KEY,'personal_finance_v1'].forEach(k=>store.del(k));
+    Object.keys(localStorage).filter(k=>/personal_finance/i.test(k)).forEach(k=>localStorage.removeItem(k));
+  }catch(e){console.warn(e)}
+  DB=[];hideLoader();location.reload();
+}
 $('signOutBtn').addEventListener('click',async()=>{if(dirty&&!confirmDiscard())return;try{await auth.signOut()}catch(err){toast('Could not sign out: '+err.message,'error')}});
 window.ReportProTheme?.applySaved();
 if(firebaseReady&&auth)auth.onAuthStateChanged(user=>{if(user)bootAuthenticatedUser(user);else bootSignedOut()});
