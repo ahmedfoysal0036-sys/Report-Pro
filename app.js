@@ -286,7 +286,7 @@ function renumber(){
 function setRows(rows,min){
   $('entries').innerHTML='';
   let last=-1;(rows||[]).forEach((r,i)=>{if(rowFilled(r))last=i});
-  const n=Math.max(min||3,last+1);
+  const n=Math.max(min||1,last+1);
   for(let i=0;i<n;i++)addRow((rows||[])[i]);
 }
 function readEntry(el){
@@ -434,7 +434,7 @@ function resetFields(){
   $('hrId').value=DEFAULTS.hr;$('userDesig').value=DEFAULTS.desig;
   $('reportDate').value=todayStr();
   $('startTime').value='09:00';$('endTime').value='18:00';
-  applyShift('DAY');
+  applyShift('DAY');updateEmpSummary();
 }
 function loadForm(d,min){
   d=normalize(d);resetFields();
@@ -451,12 +451,12 @@ function loadForm(d,min){
     if(d.endTime)$('endTime').value=d.endTime;
     if(d.startTime&&d.endTime)calcOT();else if(d.ot)$('otHours').value=d.ot;
   }
-  setRows(d.rows,min);setDirty(false);
+  setRows(d.rows,min);setDirty(false);updateEmpSummary();
 }
 function openRecord(r){loadForm(r);store.del(DRAFT_KEY);showTab('report')}
 function newEntry(force){
   if(!force&&!confirmDiscard())return;
-  store.del(DRAFT_KEY);resetFields();setRows([],5);setDirty(false);showTab('report');
+  store.del(DRAFT_KEY);resetFields();setRows([],1);setDirty(false);showTab('report');
 }
 function scheduleDraft(){
   clearTimeout(draftTimer);
@@ -499,6 +499,7 @@ function deleteRecords(ids){
   DB=DB.filter(r=>!ids.includes(r.id));
   if(!persistLocal()){DB=before;toast('Delete cancelled: device storage could not be updated.','error');return}
   ids.forEach(id=>selected.delete(id));
+  addToTrash(recs);
   if(ids.includes($('editingId').value))$('editingId').value='';
   const q=readPending();ids.forEach(id=>q[String(id)]=null);
   if(!writePending(q)){
@@ -904,12 +905,16 @@ const actions={
   'reset-filters':()=>{['hSearch','dateFrom','dateTo'].forEach(i=>$(i).value='');$('hShift').value='all';renderHistory()},
   pdf:exportPDF,excel:exportExcel,print:printReports,
   'json-backup':exportJSON,restore:()=>$('restoreInput').click(),sync:syncNow,'wipe-all':wipeAllData,
+  bin:()=>openBin(),
+  'bk-excel':exportExcel,'bk-json':exportJSON,
+  'rs-excel':()=>{const i=$('restoreInput');i.accept='.xlsx,.xls';i.click()},
+  'rs-json':()=>{const i=$('restoreInput');i.accept='.json';i.click()},
   theme:b=>window.ReportProTheme?.toggleMenu(b)
 };
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');
-  if(b&&actions[b.dataset.act]){if(e.target.closest('#menu'))$('menu').open=false;actions[b.dataset.act](b,e);return}
-  if(!e.target.closest('#menu'))$('menu').open=false;
+  if(b&&actions[b.dataset.act]){closePops();actions[b.dataset.act](b,e);return}
+  closePops(e.target.closest('.hdr-pop'));
 });
 $('historyList').addEventListener('change',e=>{
   if(e.target.classList.contains('chk')){e.target.checked?selected.add(e.target.dataset.id):selected.delete(e.target.dataset.id);updateSelUI()}
@@ -994,6 +999,86 @@ $('resetPasswordBtn').addEventListener('click',async()=>{
   const email=$('loginEmail').value.trim();if(!email){showAuthError('Enter your work email first.');return}
   try{await auth.sendPasswordResetEmail(email);showAuthError('Password reset email sent if the account exists.')}catch(err){showAuthError(err.message)}
 });
+/* ---------- Header popups ---------- */
+function closePops(except){document.querySelectorAll('.hdr-pop[open]').forEach(d=>{if(d!==except)d.open=false})}
+
+/* ---------- Employee details (collapsed by default) ---------- */
+function updateEmpSummary(){
+  const s=$('empSummary');if(!s)return;
+  const parts=[$('userName').value,$('hrId').value,$('userDesig').value].map(v=>v.trim()).filter(Boolean);
+  s.textContent=parts.length?parts.join(' · '):'Not filled';
+}
+function setEmpOpen(open){
+  const f=$('empFields'),b=$('empToggle');if(!f||!b)return;
+  f.hidden=!open;b.setAttribute('aria-expanded',String(open));b.textContent=open?'Hide details':'Edit details';
+}
+(function(){
+  const b=$('empToggle'),f=$('empFields');if(!b||!f)return;
+  b.addEventListener('click',()=>setEmpOpen(f.hidden));
+  f.addEventListener('input',updateEmpSummary);
+  updateEmpSummary();
+})();
+
+/* ---------- Recycle bin (device-local) ---------- */
+const TRASH_KEY='reportpro_trash_v1',TRASH_MAX=300;
+function readTrash(){const t=parseJSON(store.get(TRASH_KEY),[]);return Array.isArray(t)?t.filter(r=>r&&r.id):[]}
+function writeTrash(t){store.set(TRASH_KEY,JSON.stringify(t.slice(0,TRASH_MAX)));updateBinBadge()}
+function updateBinBadge(){const el=$('binCount');if(!el)return;const n=readTrash().length;el.textContent=n?String(n):'';el.hidden=!n}
+function addToTrash(recs){
+  const ids=new Set(recs.map(r=>r.id)),now=Date.now();
+  writeTrash([...recs.map(r=>({...r,deletedAt:now})),...readTrash().filter(r=>!ids.has(r.id))]);
+}
+function restoreFromBin(ids){
+  const t=readTrash();
+  const recs=t.filter(r=>ids.includes(r.id)).map(r=>{const c={...r};delete c.deletedAt;return c});
+  if(!recs.length)return false;
+  const before=DB.slice();
+  recs.forEach(r=>{if(!DB.some(x=>x.id===r.id))DB.push(r)});
+  DB.sort(byDate);
+  if(!persistLocal()){DB=before;toast('Restore failed: device storage is full.','error');return false}
+  const q=readPending();
+  recs.forEach(r=>q[String(r.id)]={...r,updatedAt:Date.now(),updatedBy:currentUser?currentUser.uid:'local',schemaVersion:2});
+  if(!writePending(q)){
+    if(dbRef&&currentUser)recs.forEach(r=>dbRef.child(String(r.id)).set(r).catch(e=>{console.warn(e);setSync('error')}));
+    else toast('Restored locally, but cloud queue could not be saved. Sync before using another device.','warn');
+  } else if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error')});
+  writeTrash(t.filter(r=>!ids.includes(r.id)));
+  refreshData();
+  toast(`${recs.length} report${recs.length>1?'s':''} restored`,'success');
+  return true;
+}
+function openBin(){
+  if(document.getElementById('binOverlay'))return;
+  const ov=document.createElement('div');ov.id='binOverlay';ov.className='bin-ov';
+  ov.innerHTML='<div class="bin-box" role="dialog" aria-modal="true" aria-label="Recycle bin"><div class="bin-head"><b>Recycle bin</b><button type="button" class="btn btn-sm" data-bin="close">Close</button></div><div class="bin-list" id="binList"></div><div class="bin-foot"><button type="button" class="btn btn-sm" data-bin="empty">Empty bin</button><button type="button" class="btn btn-sm btn-danger" data-bin="wipe">Delete ALL data…</button></div></div>';
+  document.body.appendChild(ov);
+  const close=()=>{ov.remove();document.removeEventListener('keydown',onKey)};
+  const onKey=e=>{if(e.key==='Escape')close()};
+  document.addEventListener('keydown',onKey);
+  const render=()=>{
+    const t=readTrash(),box=ov.querySelector('#binList');
+    if(!t.length){box.innerHTML='<p class="bin-empty">Bin is empty. Deleted reports appear here.</p>';return}
+    box.innerHTML=t.map(r=>{
+      const first=(r.rows||[]).find(x=>rowFilled(x))||{};
+      const label=[first.c,first.s,first.cat].filter(Boolean).join(' · ')||'No activity';
+      const when=r.deletedAt?new Date(r.deletedAt).toLocaleString():'';
+      return `<div class="bin-row"><div class="bin-info"><b>${esc(r.date||'')}</b> <span>${esc(r.shift||'')}</span><small>${esc(label)}${when?' · deleted '+esc(when):''}</small></div><div class="bin-btns"><button type="button" class="btn btn-sm" data-bin="restore" data-id="${esc(String(r.id))}">Restore</button><button type="button" class="btn btn-sm btn-danger" data-bin="purge" data-id="${esc(String(r.id))}">Delete forever</button></div></div>`;
+    }).join('');
+  };
+  render();
+  ov.addEventListener('click',e=>{
+    if(e.target===ov){close();return}
+    const b=e.target.closest('[data-bin]');if(!b)return;
+    const k=b.dataset.bin,id=b.dataset.id;
+    if(k==='close')close();
+    else if(k==='restore'){restoreFromBin([id]);render()}
+    else if(k==='purge'){if(confirm('Delete this report forever? This cannot be undone.')){writeTrash(readTrash().filter(r=>String(r.id)!==id));render()}}
+    else if(k==='empty'){if(readTrash().length&&confirm('Empty the recycle bin? These reports cannot be restored afterwards.')){writeTrash([]);render()}}
+    else if(k==='wipe'){close();wipeAllData()}
+  });
+}
+updateBinBadge();
+
 /* ---------- Full data wipe (needs login password) ---------- */
 function askPassword(){
   return new Promise(res=>{
@@ -1021,7 +1106,7 @@ async function wipeAllData(){
     if(dbRef)await Promise.race([dbRef.remove(),timeout(20000,'Cloud delete timed out')]);
   }catch(err){hideLoader();toast('Cloud delete failed: '+err.message+'. Local data was kept.','error');startCloud();return}
   try{
-    [DB_KEY,DRAFT_KEY,PENDING_KEY,'personal_finance_v1'].forEach(k=>store.del(k));
+    [DB_KEY,DRAFT_KEY,PENDING_KEY,TRASH_KEY,'personal_finance_v1'].forEach(k=>store.del(k));
     Object.keys(localStorage).filter(k=>/personal_finance/i.test(k)).forEach(k=>localStorage.removeItem(k));
   }catch(e){console.warn(e)}
   DB=[];hideLoader();location.reload();
