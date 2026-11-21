@@ -977,21 +977,31 @@ function init(){
   startCloud();
 }
 function showAuthError(message){$('authError').textContent=message||''}
+/* Lock feedback: open on success, shake + red on wrong password */
+const lockGate=$('authGate'),lockLabel=lockGate.querySelector('.nm-status-text');let lockTimer=0,manualLogin=false;
+function lockSet(cls,text){clearTimeout(lockTimer);lockGate.classList.remove('lock-open','lock-denied');void lockGate.offsetWidth;if(cls)lockGate.classList.add(cls);if(lockLabel)lockLabel.textContent=text}
+function lockReset(){lockSet('','System protected')}
+function lockTop(){try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){window.scrollTo(0,0)}}
+function lockDeny(){lockTop();lockSet('lock-denied','Access denied');lockTimer=setTimeout(lockReset,2600)}
+function lockOpen(){const f=document.activeElement;if(f&&f.blur)f.blur();lockTop();lockSet('lock-open','Access granted')}
 function bootAuthenticatedUser(user){
   currentUser=user;
   window.currentActivityUid=user.uid;
   window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:user.uid}}));
-  $('authGate').hidden=true;$('app').hidden=false;
-  $('currentUser').textContent=user.email||user.uid;$('currentUser').title=user.email||user.uid;
-  if(appInitialized)startCloud();else init();
+  const enter=()=>{
+    lockReset();$('authGate').hidden=true;$('app').hidden=false;
+    $('currentUser').textContent=user.email||user.uid;$('currentUser').title=user.email||user.uid;
+    if(appInitialized)startCloud();else init();
+  };
+  if(manualLogin){manualLogin=false;lockOpen();setTimeout(enter,1700)}else enter();
 }
-function bootSignedOut(){stopCloud();window.currentActivityUid=null;window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:null}}));currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
+function bootSignedOut(){stopCloud();window.currentActivityUid=null;window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:null}}));currentUser=null;lockReset();$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();showAuthError('');
   if(!firebaseReady||!auth){showAuthError('Setup required: configure Firebase and enable Email/Password sign-in.');return}
-  $('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';
+  $('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';lockReset();manualLogin=true;
   try{await auth.signInWithEmailAndPassword($('loginEmail').value.trim(),$('loginPassword').value)}
-  catch(err){showAuthError(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'?'Email or password is incorrect.':err.message)}
+  catch(err){manualLogin=false;lockDeny();showAuthError(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'?'Email or password is incorrect.':err.message)}
   finally{$('loginBtn').disabled=false;$('loginBtn').textContent='Sign in'}
 });
 $('resetPasswordBtn').addEventListener('click',async()=>{
