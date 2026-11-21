@@ -974,3 +974,14 @@ table.dash-table{width:100%;border-collapse:collapse;font-size:13px}
 .bin-info small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bin-btns{display:flex;gap:6px;flex:none}
 @media(max-width:520px){.bin-row{flex-direction:column;align-items:stretch}.bin-btns{justify-content:flex-end}}
+
+/* ===== iPhone Safari: date/time inputs must not overflow their grid cell ===== */
+.grid>.field,.time-grid>.field,.duty-row2>.field{min-width:0}
+#app .field input[type="date"],#app .field input[type="time"],#app .toolbar input[type="date"]{
+  -webkit-appearance:none;appearance:none;display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;text-align:left;
+}
+#app .field input[type="date"]::-webkit-date-and-time-value,#app .field input[type="time"]::-webkit-date-and-time-value{text-align:left;margin:0;min-height:1.4em}
+@media(max-width:720px){
+  #app .field input[type="date"],#app .field input[type="time"]{font-size:16px;padding-left:10px;padding-right:10px}
+  #view-report .time-grid.grid.g3{gap:10px}
+}
