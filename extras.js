@@ -108,7 +108,7 @@
 .x-sub{font-size:12.5px;color:var(--muted);line-height:1.4}
 .x-big{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
 .x-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.x-input{min-width:0;max-width:210px;padding:9px 11px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);color:var(--text);font:inherit}
+.x-input{min-width:0;max-width:180px;padding:9px 11px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);color:var(--text);font:inherit}
 .x-bar{height:12px;border-radius:999px;background:var(--surface-3);overflow:hidden}
 .x-bar>i{display:block;height:100%;border-radius:inherit;background:var(--primary);transition:width .4s}
 .x-bar.done>i{background:var(--success)}
@@ -170,7 +170,7 @@
       <div class="card x-card" id="xWeek"><div class="x-head"><div><p class="page-kicker">Weekly view</p><h2 class="card-title" id="xWeekTitle">This week</h2></div><div class="x-row"><button class="btn btn-icon" type="button" data-x="wk-prev" aria-label="Previous week">‹</button><button class="btn btn-sm" type="button" data-x="wk-now">This week</button><button class="btn btn-icon" type="button" data-x="wk-next" aria-label="Next week">›</button></div></div><div id="xWeekBody"></div></div>
       <div class="card x-card" id="xStats"><div class="x-head"><div><p class="page-kicker">Insights</p><h2 class="card-title" id="xStatsTitle">Duty stats</h2></div></div><div id="xStatsBody"></div></div>
       <div class="card x-card" id="xExport"><div class="x-head"><div><p class="page-kicker">Export</p><h2 class="card-title">OT &amp; payable Excel report</h2></div></div>
-      <div class="x-row"><input class="x-input" id="xExpMonth" type="month" aria-label="Month to export" style="max-width:210px"><button class="btn btn-sm" type="button" data-x="export">Download .xlsx</button></div>
+      <div class="x-row"><input class="x-input" id="xExpMonth" type="month" aria-label="Month to export" style="max-width:180px"><button class="btn btn-sm" type="button" data-x="export">Download .xlsx</button></div>
         <p class="x-sub">Includes a day-by-day sheet for the chosen month and a month-by-month summary for that year (OT hours, OT taka, holiday allowance).</p></div>`;
     host.parentNode.insertBefore(root, host.nextSibling);
     $('xExpMonth').value = today().slice(0, 7);
