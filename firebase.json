@@ -1,6 +1,6 @@
-
 {
   "hosting": {
+    "site": "myactivitiestrackers",
     "public": ".",
     "ignore": [
       "firebase.json",
