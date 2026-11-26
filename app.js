@@ -114,6 +114,45 @@ function setSync(state){
 function timeout(ms,msg){return new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg||'timeout')),ms))}
 function cloneNormalized(r){return normalize(JSON.parse(JSON.stringify(r)))}
 function rowsObject(rows){const o={};rows.forEach(r=>{if(r&&r.id)o[String(r.id)]=r});return o}
+/* ---------- One report per date: auto-merge duplicates ---------- */
+const actKey=x=>[x.c,x.s,x.cat,x.w,x.t,x.ab].map(v=>String(v==null?'':v).trim().toLowerCase()).join('|');
+const droppedIds=new Set();
+function dedupeByDate(rows){
+  const by=new Map();
+  rows.forEach(r=>{if(!r)return;const k=r.date||('_'+r.id);if(!by.has(k))by.set(k,[]);by.get(k).push(r)});
+  const out=[],dropped=[],changed=[];
+  by.forEach(list=>{
+    if(list.length===1){out.push(list[0]);return}
+    // newest edit wins; activities that only exist in the older copies are added to it
+    list.sort((a,b)=>(Number(b.updatedAt)||0)-(Number(a.updatedAt)||0)||String(b.id).localeCompare(String(a.id)));
+    const win=cloneNormalized(list[0]);if(!Array.isArray(win.rows))win.rows=[];
+    const seen=new Set(win.rows.filter(rowFilled).map(actKey));let added=false;
+    list.slice(1).forEach(l=>{
+      (l.rows||[]).filter(rowFilled).forEach(x=>{const k=actKey(x);if(!seen.has(k)){seen.add(k);win.rows.push(x);added=true}});
+      dropped.push(l);
+    });
+    if(added){win.updatedAt=Date.now();changed.push(win)}
+    out.push(win);
+  });
+  return {rows:out,dropped,changed};
+}
+function cleanDuplicates(rows){
+  const r=dedupeByDate(rows);
+  if(r.dropped.length||r.changed.length){
+    const fresh=r.dropped.filter(d=>!droppedIds.has(String(d.id)));
+    fresh.forEach(d=>droppedIds.add(String(d.id)));
+    if(fresh.length){
+      try{addToTrash(fresh)}catch(e){console.warn(e)}   // nothing is lost: copies go to the Recycle bin
+      toast(`${fresh.length} duplicate report${fresh.length>1?'s':''} merged. Copies are in the Bin.`,'success');
+    }
+    const q=readPending();
+    r.dropped.forEach(d=>{q[String(d.id)]=null});
+    r.changed.forEach(w=>{q[String(w.id)]=w});
+    writePending(q);
+    if(dbRef&&currentUser)flushPending().then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('pending')});
+  }
+  return r.rows;
+}
 function mergeInitialRows(localRows,cloudRows){
   const map=new Map();
   [...(cloudRows||[]),...(localRows||[])].filter(Boolean).forEach(r=>{
@@ -121,7 +160,7 @@ function mergeInitialRows(localRows,cloudRows){
     const old=map.get(id);
     if(!old||(Number(c.updatedAt)||0)>=(Number(old.updatedAt)||0))map.set(id,c);
   });
-  return [...map.values()].sort(byDate);
+  return cleanDuplicates([...map.values()]).sort(byDate);
 }
 async function flushPending(){
   if(!dbRef||!currentUser)return;
@@ -139,7 +178,7 @@ function applyCloud(val){
     const localRows=parseJSON(store.get(DB_KEY),[]);
     if(!cloudRows.length&&localRows.length){
       const previous=DB;
-      DB=localRows.filter(Boolean).map(normalize).sort(byDate);
+      DB=cleanDuplicates(localRows.filter(Boolean).map(normalize)).sort(byDate);
       if(!persistLocal()){DB=previous;setSync('error');toast('Local report storage is full; previous data was preserved. Export a backup before retrying.','error');return;}
       // Cloud is empty, so add each local report without replacing the /reports root.
       dbRef.update(rowsObject(DB)).then(()=>setSync('online')).catch(e=>{console.warn(e);setSync('error')});
@@ -163,7 +202,7 @@ function applyCloud(val){
     refreshData();setSync('pending');return;
   }
   const previous=DB;
-  DB=cloudRows.sort(byDate);
+  DB=cleanDuplicates(cloudRows).sort(byDate);
   if(!persistLocal()){DB=previous;setSync('error');toast('Cloud update could not be stored on this device. Existing local data was kept.','error');return}
   refreshData();
 }
@@ -977,31 +1016,21 @@ function init(){
   startCloud();
 }
 function showAuthError(message){$('authError').textContent=message||''}
-/* Lock feedback: open on success, shake + red on wrong password */
-const lockGate=$('authGate'),lockLabel=lockGate.querySelector('.nm-status-text');let lockTimer=0,manualLogin=false;
-function lockSet(cls,text){clearTimeout(lockTimer);lockGate.classList.remove('lock-open','lock-denied');void lockGate.offsetWidth;if(cls)lockGate.classList.add(cls);if(lockLabel)lockLabel.textContent=text}
-function lockReset(){lockSet('','System protected')}
-function lockTop(){try{window.scrollTo({top:0,behavior:'smooth'})}catch(e){window.scrollTo(0,0)}}
-function lockDeny(){lockTop();lockSet('lock-denied','Access denied');lockTimer=setTimeout(lockReset,2600)}
-function lockOpen(){const f=document.activeElement;if(f&&f.blur)f.blur();lockTop();lockSet('lock-open','Access granted')}
 function bootAuthenticatedUser(user){
   currentUser=user;
   window.currentActivityUid=user.uid;
   window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:user.uid}}));
-  const enter=()=>{
-    lockReset();$('authGate').hidden=true;$('app').hidden=false;
-    $('currentUser').textContent=user.email||user.uid;$('currentUser').title=user.email||user.uid;
-    if(appInitialized)startCloud();else init();
-  };
-  if(manualLogin){manualLogin=false;lockOpen();setTimeout(enter,1700)}else enter();
+  $('authGate').hidden=true;$('app').hidden=false;
+  $('currentUser').textContent=user.email||user.uid;$('currentUser').title=user.email||user.uid;
+  if(appInitialized)startCloud();else init();
 }
-function bootSignedOut(){stopCloud();window.currentActivityUid=null;window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:null}}));currentUser=null;lockReset();$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
+function bootSignedOut(){stopCloud();window.currentActivityUid=null;window.dispatchEvent(new CustomEvent('activity-auth-changed',{detail:{uid:null}}));currentUser=null;$('app').hidden=true;$('authGate').hidden=false;setSync('offline')}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();showAuthError('');
   if(!firebaseReady||!auth){showAuthError('Setup required: configure Firebase and enable Email/Password sign-in.');return}
-  $('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';lockReset();manualLogin=true;
+  $('loginBtn').disabled=true;$('loginBtn').textContent='Signing in…';
   try{await auth.signInWithEmailAndPassword($('loginEmail').value.trim(),$('loginPassword').value)}
-  catch(err){manualLogin=false;lockDeny();showAuthError(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'?'Email or password is incorrect.':err.message)}
+  catch(err){showAuthError(err.code==='auth/invalid-credential'||err.code==='auth/wrong-password'?'Email or password is incorrect.':err.message)}
   finally{$('loginBtn').disabled=false;$('loginBtn').textContent='Sign in'}
 });
 $('resetPasswordBtn').addEventListener('click',async()=>{
@@ -1044,12 +1073,13 @@ function restoreFromBin(ids){
   if(!recs.length)return false;
   const before=DB.slice();
   recs.forEach(r=>{if(!DB.some(x=>x.id===r.id))DB.push(r)});
-  DB.sort(byDate);
+  DB=cleanDuplicates(DB);DB.sort(byDate);
   if(!persistLocal()){DB=before;toast('Restore failed: device storage is full.','error');return false}
   const q=readPending();
-  recs.forEach(r=>q[String(r.id)]={...r,updatedAt:Date.now(),updatedBy:currentUser?currentUser.uid:'local',schemaVersion:2});
+  const kept=recs.filter(r=>DB.some(x=>x.id===r.id));
+  kept.forEach(r=>q[String(r.id)]={...r,updatedAt:Date.now(),updatedBy:currentUser?currentUser.uid:'local',schemaVersion:2});
   if(!writePending(q)){
-    if(dbRef&&currentUser)recs.forEach(r=>dbRef.child(String(r.id)).set(r).catch(e=>{console.warn(e);setSync('error')}));
+    if(dbRef&&currentUser)kept.forEach(r=>dbRef.child(String(r.id)).set(r).catch(e=>{console.warn(e);setSync('error')}));
     else toast('Restored locally, but cloud queue could not be saved. Sync before using another device.','warn');
   } else if(dbRef&&currentUser)flushPending().catch(e=>{console.warn(e);setSync('error')});
   writeTrash(t.filter(r=>!ids.includes(r.id)));
