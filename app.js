@@ -945,6 +945,7 @@ const actions={
   pdf:exportPDF,excel:exportExcel,print:printReports,
   'json-backup':exportJSON,restore:()=>$('restoreInput').click(),sync:syncNow,'wipe-all':wipeAllData,
   bin:()=>openBin(),
+  'tg-push':()=>pushTelegram(),'tg-set':()=>telegramSettings(),
   'bk-excel':exportExcel,'bk-json':exportJSON,
   'rs-excel':()=>{const i=$('restoreInput');i.accept='.xlsx,.xls';i.click()},
   'rs-json':()=>{const i=$('restoreInput');i.accept='.json';i.click()},
@@ -1118,6 +1119,59 @@ function openBin(){
   });
 }
 updateBinBadge();
+
+/* ---------- Push backup to Telegram (token stays in this browser only) ---------- */
+const TG_KEY='reportpro_tg_v1';
+function tgCfg(){const c=parseJSON(store.get(TG_KEY),null);return c&&c.token&&c.chat?c:null}
+function askTelegram(cur){
+  return new Promise(res=>{
+    const ov=document.createElement('div');ov.className='bin-ov';
+    ov.innerHTML='<div class="bin-box tg-box" role="dialog" aria-modal="true" aria-label="Telegram settings"><div class="bin-head"><b>Telegram settings</b></div><div class="tg-form"><p class="tg-note">Saved only in this browser. It is never uploaded or stored in the code.</p><label>Bot token<input type="password" id="tgToken" autocomplete="off" placeholder="123456789:AA..."></label><label>Chat ID<input type="text" id="tgChat" autocomplete="off" inputmode="numeric" placeholder="123456789"></label></div><div class="bin-foot"><button type="button" class="btn btn-sm btn-danger" data-k="remove"'+(cur?'':' hidden')+'>Remove saved</button><span style="flex:1"></span><button type="button" class="btn btn-sm" data-k="cancel">Cancel</button><button type="button" class="btn btn-sm btn-primary" data-k="save">Save &amp; send backup</button></div></div>';
+    document.body.appendChild(ov);
+    const t=ov.querySelector('#tgToken'),c=ov.querySelector('#tgChat');
+    if(cur){c.value=cur.chat;t.placeholder='Saved (leave empty to keep)'}
+    t.focus();
+    const done=v=>{ov.remove();res(v)};
+    ov.addEventListener('click',e=>{
+      if(e.target===ov){done(null);return}
+      const k=e.target.closest('[data-k]')?.dataset.k;if(!k)return;
+      if(k==='cancel')done(null);
+      else if(k==='remove')done({remove:true});
+      else{
+        const token=(t.value.trim()||(cur?cur.token:'')),chat=c.value.trim();
+        if(!/^\d+:[\w-]{20,}$/.test(token)){toast('Bot token looks wrong. Copy it again from BotFather.','warn');return}
+        if(!/^-?\d+$/.test(chat)){toast('Chat ID must be a number.','warn');return}
+        done({token,chat});
+      }
+    });
+  });
+}
+async function telegramSettings(){
+  const v=await askTelegram(tgCfg());if(!v)return;
+  if(v.remove){store.del(TG_KEY);toast('Telegram settings removed from this browser','success');return}
+  store.set(TG_KEY,JSON.stringify(v));
+  await pushTelegram();
+}
+async function pushTelegram(){
+  const cfg=tgCfg();
+  if(!cfg){await telegramSettings();return}
+  const financePayload=window.exportPersonalFinanceBackup?window.exportPersonalFinanceBackup():parseJSON(store.get('personal_finance_v1'),null);
+  const bundle={backupType:'activity-tracker-full-backup',backupVersion:2,createdAt:new Date().toISOString(),source:'telegram-button',reports:DB,personalFinance:financePayload};
+  const form=new FormData();
+  form.append('chat_id',cfg.chat);
+  form.append('caption',`✅ Manual backup ${todayStr()}\nReports: ${DB.length}${financePayload?'\nIncludes personal finance':''}`);
+  form.append('document',new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}),`activity_backup_${todayStr()}.json`);
+  showLoader('Sending to Telegram…');
+  try{
+    const res=await Promise.race([fetch('https://api.telegram.org/bot'+cfg.token+'/sendDocument',{method:'POST',body:form}),timeout(30000,'Telegram timed out')]);
+    const j=await res.json().catch(()=>({}));
+    if(!res.ok||!j.ok)throw new Error(j.description||('HTTP '+res.status));
+    toast(`Backup sent to Telegram (${DB.length} reports)`,'success');
+  }catch(e){
+    const m=String(e.message||e);
+    toast(/unauthorized/i.test(m)?'Telegram: bot token is wrong. Open Telegram settings and fix it.':/chat not found/i.test(m)?'Telegram: chat not found. Send /start to your bot, then check the Chat ID.':'Telegram failed: '+m,'error');
+  }finally{hideLoader()}
+}
 
 /* ---------- Full data wipe (needs login password) ---------- */
 function askPassword(){
