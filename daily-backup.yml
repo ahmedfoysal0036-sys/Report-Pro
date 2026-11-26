@@ -1,0 +1,31 @@
+name: Daily report backup
+
+on:
+  schedule:
+    # 17:30 UTC = 23:30 Bangladesh time (GitHub may start it up to ~30 min late)
+    - cron: '30 17 * * *'
+  workflow_dispatch: {}      # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install firebase-admin
+        run: npm install --prefix .github/scripts --no-save --no-package-lock firebase-admin@12
+
+      - name: Back up reports to Telegram
+        run: node .github/scripts/backup.js
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_INFINITE_V1 }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
