@@ -1,5 +1,5 @@
 // Minimal service worker (Chrome install er jonno fetch handler lagbe)
-const CACHE = 'activity-tracker-v1';
+const CACHE = 'activity-tracker-v2';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
   e.waitUntil(
