@@ -11,3 +11,5 @@ firebase-adminsdk*.json
 *.pem
 *.key
 reference/
+
+activity_backup_*.json
